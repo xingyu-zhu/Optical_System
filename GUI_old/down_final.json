@@ -1,0 +1,1124 @@
+{
+  "components": [
+    {
+      "uuid": "07211b97-ed65-4871-ad3c-19d88af0d83e",
+      "seq_id": 0,
+      "name": "OLTTxDSP",
+      "type": "OLTTxDSP",
+      "x": -3615.6093750000005,
+      "y": -1042.609375,
+      "icon_path": "icon/Tx_DSP.png",
+      "properties": {
+        "BaudRate": [
+          6250000000.0,
+          "Baud"
+        ],
+        "M": [
+          16,
+          ""
+        ],
+        "num_bands": [
+          4,
+          ""
+        ],
+        "symbolnum": [
+          32768,
+          ""
+        ]
+      }
+    },
+    {
+      "uuid": "5614b33c-2363-4b79-92f5-8b1c5bdff216",
+      "seq_id": 1,
+      "name": "DAC",
+      "type": "DAC",
+      "x": -3469.6093750000005,
+      "y": -1048.609375,
+      "icon_path": "icon/DAC.jpg",
+      "properties": {
+        "sampling_rate": [
+          92000000000.0,
+          "Sa/s"
+        ],
+        "DAC_BW_Analog": [
+          32000000000.0,
+          "Hz"
+        ],
+        "Resolution": [
+          8,
+          ""
+        ]
+      }
+    },
+    {
+      "uuid": "260df5ab-7f27-4863-b3a6-a0ae5b2d1449",
+      "seq_id": 2,
+      "name": "Driver",
+      "type": "Driver",
+      "x": -3334.6093750000005,
+      "y": -1049.609375,
+      "icon_path": "icon/Driver.jpg",
+      "properties": {
+        "Bandwidth": [
+          35000000000.0,
+          "Hz"
+        ],
+        "Gain_dB": [
+          3,
+          "dB"
+        ]
+      }
+    },
+    {
+      "uuid": "559988db-0cd5-4a4e-b597-b5daf528dad7",
+      "seq_id": 3,
+      "name": "LaserCW",
+      "type": "LaserCW",
+      "x": -3474.6093750000005,
+      "y": -869.609375,
+      "icon_path": "icon/laser.png",
+      "properties": {
+        "EmissionFrequency": [
+          193100000000000.0,
+          "Hz"
+        ],
+        "AveragePower": [
+          0.02,
+          "W"
+        ],
+        "Linewidth": [
+          100000.0,
+          "Hz"
+        ],
+        "RIN": [
+          -150,
+          "dB/Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "d1665e74-f977-45d2-abaa-abbb1b28e1f4",
+      "seq_id": 4,
+      "name": "Modulator",
+      "type": "Modulator",
+      "x": -3312.6093750000005,
+      "y": -871.609375,
+      "icon_path": "icon/modulator.jpg",
+      "properties": {
+        "Vpi": [
+          3.0,
+          "V"
+        ],
+        "VpiDC": [
+          3.0,
+          "V"
+        ],
+        "Bandwidth": [
+          35000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "3b8c8deb-8c2d-4a2f-9f08-d0d0902af166",
+      "seq_id": 5,
+      "name": "OA",
+      "type": "OA",
+      "x": -3094.6093750000005,
+      "y": -869.609375,
+      "icon_path": "icon/OA.jpg",
+      "properties": {
+        "OutputPower": [
+          0.001,
+          "W"
+        ],
+        "GainMax": [
+          100.0,
+          "dB"
+        ],
+        "NoiseFigure": [
+          5.0,
+          "dB"
+        ],
+        "Type": [
+          "PowerControlled",
+          ""
+        ],
+        "Scan_Tx_Power_MinVal": [
+          0.0,
+          "dBm"
+        ],
+        "Scan_Tx_Power_MaxVal": [
+          0.0,
+          "dBm"
+        ]
+      }
+    },
+    {
+      "uuid": "54218e11-ea3b-409f-a931-0bbadedf107d",
+      "seq_id": 6,
+      "name": "Fiber",
+      "type": "Fiber",
+      "x": -2914.6093750000005,
+      "y": -869.609375,
+      "icon_path": "icon/fiber.jpg",
+      "properties": {
+        "Length": [
+          20,
+          "km"
+        ],
+        "Loss_dB_km": [
+          0.17,
+          "dB/km"
+        ],
+        "Gamma": [
+          0.0013,
+          "W^-1 m^-1"
+        ],
+        "Dispersion": [
+          1.7e-05,
+          "s/m^2"
+        ]
+      }
+    },
+    {
+      "uuid": "f3c2cc07-1a73-45a5-bd4d-cc00960bcc8b",
+      "seq_id": 7,
+      "name": "Splitter",
+      "type": "Splitter",
+      "x": -2754.6093750000005,
+      "y": -869.609375,
+      "icon_path": "icon/splitter.jpg",
+      "properties": {
+        "N": [
+          4,
+          ""
+        ],
+        "ExcessLoss": [
+          0.0,
+          "dB"
+        ]
+      }
+    },
+    {
+      "uuid": "a94b9143-3a56-4bde-b8e9-300fc74fe2dc",
+      "seq_id": 8,
+      "name": "VOA",
+      "type": "VOA",
+      "x": -2543.6093750000005,
+      "y": -1180.609375,
+      "icon_path": "icon/VOA.jpg",
+      "properties": {
+        "Scan_ROP_MinVal": [
+          -25.0,
+          "dBm"
+        ],
+        "Scan_ROP_MaxVal": [
+          -25.0,
+          "dBm"
+        ]
+      }
+    },
+    {
+      "uuid": "ac051e19-cadf-476d-864d-2c54a0ddd9cd",
+      "seq_id": 9,
+      "name": "ICR",
+      "type": "ICR",
+      "x": -2393.6093750000005,
+      "y": -1184.609375,
+      "icon_path": "icon/ICR.png",
+      "properties": {
+        "Responsivity": [
+          0.6,
+          "A/W"
+        ],
+        "PD_BandWidth": [
+          25000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "95e94ad7-c82d-4462-b470-42127982baa2",
+      "seq_id": 10,
+      "name": "TIA",
+      "type": "TIA",
+      "x": -2233.6093750000005,
+      "y": -1184.609375,
+      "icon_path": "icon/TIA.jpg",
+      "properties": {
+        "Gain": [
+          2000,
+          ""
+        ],
+        "BandWidth": [
+          50000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "d3ffc310-bd6d-4303-8f59-93d250b7a39f",
+      "seq_id": 11,
+      "name": "ADC",
+      "type": "ADC",
+      "x": -2059.6093750000005,
+      "y": -1184.609375,
+      "icon_path": "icon/ADC.jpg",
+      "properties": {
+        "SamplingRate": [
+          256000000000.0,
+          "Hz"
+        ],
+        "Resolution": [
+          10,
+          ""
+        ],
+        "ADC_BW_Analog": [
+          59000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "c616c175-2bce-4e93-a399-05bd26461b77",
+      "seq_id": 12,
+      "name": "LO",
+      "type": "LO",
+      "x": -2393.6093750000005,
+      "y": -1324.6093750000002,
+      "icon_path": "icon/laser.png",
+      "properties": {
+        "EmissionFrequency": [
+          193100000000000.0,
+          "Hz"
+        ],
+        "LineWidth": [
+          5000000.0,
+          "Hz"
+        ],
+        "Power": [
+          0.02,
+          "W"
+        ],
+        "RIN": [
+          -150,
+          "dB/Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "ba233c8e-58f5-4fc7-8b38-b771c0793266",
+      "seq_id": 13,
+      "name": "ONURxDSP",
+      "type": "ONURxDSP",
+      "x": -1889.6093750000005,
+      "y": -1190.609375,
+      "icon_path": "icon/Rx_DSP.png",
+      "properties": {
+        "EqualizerTaps": [
+          41,
+          ""
+        ],
+        "Convergence": [
+          10000,
+          ""
+        ],
+        "StepSize": [
+          0.001,
+          ""
+        ],
+        "Rolloff": [
+          0.1,
+          ""
+        ],
+        "PilotBw": [
+          2000000000.0,
+          "Hz"
+        ],
+        "PhaseNoiseBw": [
+          10000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "74e6ae57-7457-441c-a837-40aedaf886cd",
+      "seq_id": 14,
+      "name": "VOA_1",
+      "type": "VOA",
+      "x": -2534.6093750000005,
+      "y": -929.609375,
+      "icon_path": "icon/VOA.jpg",
+      "properties": {
+        "Scan_ROP_MinVal": [
+          -25.0,
+          "dBm"
+        ],
+        "Scan_ROP_MaxVal": [
+          -25.0,
+          "dBm"
+        ]
+      }
+    },
+    {
+      "uuid": "4c3a1a51-cc1e-464e-b020-24f080804449",
+      "seq_id": 15,
+      "name": "ICR_1",
+      "type": "ICR",
+      "x": -2374.6093750000005,
+      "y": -929.609375,
+      "icon_path": "icon/ICR.png",
+      "properties": {
+        "Responsivity": [
+          0.6,
+          "A/W"
+        ],
+        "PD_BandWidth": [
+          25000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "406f4a87-5279-4045-8e18-dc854a822af8",
+      "seq_id": 16,
+      "name": "TIA_1",
+      "type": "TIA",
+      "x": -2234.6093750000005,
+      "y": -929.609375,
+      "icon_path": "icon/TIA.jpg",
+      "properties": {
+        "Gain": [
+          2000,
+          ""
+        ],
+        "BandWidth": [
+          50000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "14016ee5-4c27-4333-be36-dab9facb75c0",
+      "seq_id": 17,
+      "name": "ADC_1",
+      "type": "ADC",
+      "x": -2054.6093750000005,
+      "y": -929.609375,
+      "icon_path": "icon/ADC.jpg",
+      "properties": {
+        "SamplingRate": [
+          256000000000.0,
+          "Hz"
+        ],
+        "Resolution": [
+          10,
+          ""
+        ],
+        "ADC_BW_Analog": [
+          59000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "2691302b-55dc-4134-ab0d-8e91d11516be",
+      "seq_id": 18,
+      "name": "ONURxDSP_1",
+      "type": "ONURxDSP",
+      "x": -1874.6093750000005,
+      "y": -929.609375,
+      "icon_path": "icon/Rx_DSP.png",
+      "properties": {
+        "EqualizerTaps": [
+          41,
+          ""
+        ],
+        "Convergence": [
+          10000,
+          ""
+        ],
+        "StepSize": [
+          0.001,
+          ""
+        ],
+        "Rolloff": [
+          0.1,
+          ""
+        ],
+        "PilotBw": [
+          2000000000.0,
+          "Hz"
+        ],
+        "PhaseNoiseBw": [
+          10000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "30d20274-2d89-418c-9be6-1633d895396a",
+      "seq_id": 19,
+      "name": "LO_1",
+      "type": "LO",
+      "x": -2374.6093750000005,
+      "y": -1049.609375,
+      "icon_path": "icon/laser.png",
+      "properties": {
+        "EmissionFrequency": [
+          193100000000000.0,
+          "Hz"
+        ],
+        "LineWidth": [
+          5000000.0,
+          "Hz"
+        ],
+        "Power": [
+          0.02,
+          "W"
+        ],
+        "RIN": [
+          -150,
+          "dB/Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "6fe6930d-74a9-4172-b9c3-74e8bc023938",
+      "seq_id": 20,
+      "name": "VOA_2",
+      "type": "VOA",
+      "x": -2527.1093750000005,
+      "y": -621.5625000000001,
+      "icon_path": "icon/VOA.jpg",
+      "properties": {
+        "Scan_ROP_MinVal": [
+          -25.0,
+          "dBm"
+        ],
+        "Scan_ROP_MaxVal": [
+          -25.0,
+          "dBm"
+        ]
+      }
+    },
+    {
+      "uuid": "31fa9285-049c-4093-9f1a-aa438a080b0d",
+      "seq_id": 21,
+      "name": "ICR_2",
+      "type": "ICR",
+      "x": -2387.1093750000005,
+      "y": -619.609375,
+      "icon_path": "icon/ICR.png",
+      "properties": {
+        "Responsivity": [
+          0.6,
+          "A/W"
+        ],
+        "PD_BandWidth": [
+          25000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "59214355-b8a4-4c0e-838d-4860396081d9",
+      "seq_id": 22,
+      "name": "TIA_2",
+      "type": "TIA",
+      "x": -2187.1093750000005,
+      "y": -599.609375,
+      "icon_path": "icon/TIA.jpg",
+      "properties": {
+        "Gain": [
+          2000,
+          ""
+        ],
+        "BandWidth": [
+          50000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "85ffe9d9-50ee-4bb2-abef-06291a48e095",
+      "seq_id": 23,
+      "name": "ADC_2",
+      "type": "ADC",
+      "x": -2029.9218750000005,
+      "y": -605.859375,
+      "icon_path": "icon/ADC.jpg",
+      "properties": {
+        "SamplingRate": [
+          256000000000.0,
+          "Hz"
+        ],
+        "Resolution": [
+          10,
+          ""
+        ],
+        "ADC_BW_Analog": [
+          59000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "c962c6a1-b8b0-44a4-a79e-f86f7bfde08d",
+      "seq_id": 24,
+      "name": "ONURxDSP_2",
+      "type": "ONURxDSP",
+      "x": -1885.5468750000005,
+      "y": -609.296875,
+      "icon_path": "icon/Rx_DSP.png",
+      "properties": {
+        "EqualizerTaps": [
+          41,
+          ""
+        ],
+        "Convergence": [
+          10000,
+          ""
+        ],
+        "StepSize": [
+          0.001,
+          ""
+        ],
+        "Rolloff": [
+          0.1,
+          ""
+        ],
+        "PilotBw": [
+          2000000000.0,
+          "Hz"
+        ],
+        "PhaseNoiseBw": [
+          10000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "2c7ef545-122a-47ef-99f1-d2d1bfd8cdb4",
+      "seq_id": 25,
+      "name": "LO_2",
+      "type": "LO",
+      "x": -2383.9843750000005,
+      "y": -774.921875,
+      "icon_path": "icon/laser.png",
+      "properties": {
+        "EmissionFrequency": [
+          193100000000000.0,
+          "Hz"
+        ],
+        "LineWidth": [
+          5000000.0,
+          "Hz"
+        ],
+        "Power": [
+          0.02,
+          "W"
+        ],
+        "RIN": [
+          -150,
+          "dB/Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "01afb683-7e55-4a3d-84a9-59ebdb108c36",
+      "seq_id": 26,
+      "name": "VOA_3",
+      "type": "VOA",
+      "x": -2520,
+      "y": -320,
+      "icon_path": "icon/VOA.jpg",
+      "properties": {
+        "Scan_ROP_MinVal": [
+          -25.0,
+          "dBm"
+        ],
+        "Scan_ROP_MaxVal": [
+          -25.0,
+          "dBm"
+        ]
+      }
+    },
+    {
+      "uuid": "fbded137-05d4-402c-aaff-f9165b25f753",
+      "seq_id": 27,
+      "name": "ICR_3",
+      "type": "ICR",
+      "x": -2334.1406250000005,
+      "y": -312.18750000000006,
+      "icon_path": "icon/ICR.png",
+      "properties": {
+        "Responsivity": [
+          0.6,
+          "A/W"
+        ],
+        "PD_BandWidth": [
+          25000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "a544546d-d129-4ebb-a9e8-3fbb69fd83d1",
+      "seq_id": 28,
+      "name": "TIA_3",
+      "type": "TIA",
+      "x": -2144.9218750000005,
+      "y": -303.90625000000006,
+      "icon_path": "icon/TIA.jpg",
+      "properties": {
+        "Gain": [
+          2000,
+          ""
+        ],
+        "BandWidth": [
+          50000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "00b69956-a50f-4c8e-ae4f-d05da5538090",
+      "seq_id": 29,
+      "name": "ADC_3",
+      "type": "ADC",
+      "x": -1992.734375,
+      "y": -310.23437500000006,
+      "icon_path": "icon/ADC.jpg",
+      "properties": {
+        "SamplingRate": [
+          256000000000.0,
+          "Hz"
+        ],
+        "Resolution": [
+          10,
+          ""
+        ],
+        "ADC_BW_Analog": [
+          59000000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "4e9749ac-9983-4a16-b076-9a07266f176e",
+      "seq_id": 30,
+      "name": "ONURxDSP_3",
+      "type": "ONURxDSP",
+      "x": -1816.171875,
+      "y": -320.00000000000006,
+      "icon_path": "icon/Rx_DSP.png",
+      "properties": {
+        "EqualizerTaps": [
+          41,
+          ""
+        ],
+        "Convergence": [
+          10000,
+          ""
+        ],
+        "StepSize": [
+          0.001,
+          ""
+        ],
+        "Rolloff": [
+          0.1,
+          ""
+        ],
+        "PilotBw": [
+          2000000000.0,
+          "Hz"
+        ],
+        "PhaseNoiseBw": [
+          10000000.0,
+          "Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "f356eb21-5a09-45fd-a11d-158220508988",
+      "seq_id": 31,
+      "name": "LO_3",
+      "type": "LO",
+      "x": -2340,
+      "y": -460,
+      "icon_path": "icon/laser.png",
+      "properties": {
+        "EmissionFrequency": [
+          193100000000000.0,
+          "Hz"
+        ],
+        "LineWidth": [
+          5000000.0,
+          "Hz"
+        ],
+        "Power": [
+          0.02,
+          "W"
+        ],
+        "RIN": [
+          -150,
+          "dB/Hz"
+        ]
+      }
+    },
+    {
+      "uuid": "5f941192-fd22-4983-a06e-b89d7f80b927",
+      "seq_id": 32,
+      "name": "O-Analyzer",
+      "type": "O-Analyzer",
+      "x": -3083.90625,
+      "y": -651.7187500000001,
+      "icon_path": "icon/Analyzer.png",
+      "properties": {
+        "MeasurementType": [
+          "Spectrum",
+          "str"
+        ],
+        "SweepPoints": [
+          1001,
+          ""
+        ],
+        "ResultImagePath": [
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "uuid": "5f0d56ca-f231-46e4-a883-aa0bcfa3bcd8",
+      "seq_id": 33,
+      "name": "E-Analyzer",
+      "type": "E-Analyzer",
+      "x": -1641.2499999999995,
+      "y": -1191.8750000000002,
+      "icon_path": "icon/Analyzer.png",
+      "properties": {
+        "MeasurementType": [
+          "Spectrum",
+          "str"
+        ],
+        "SweepPoints": [
+          1001,
+          ""
+        ],
+        "ResultImagePath": [
+          "",
+          ""
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "uuid": "20b0b40a-4ed8-4079-95c2-9534f659507c",
+      "seq_id": 0,
+      "source_id": 0,
+      "target_id": 1,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "99f64847-1a6b-4250-97ea-2dc1ecb6b706",
+      "seq_id": 1,
+      "source_id": 1,
+      "target_id": 2,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "ff9f689a-2e39-4e55-b477-8d957eaee128",
+      "seq_id": 2,
+      "source_id": 3,
+      "target_id": 4,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "2d1c08b8-6e72-40d0-adc2-c0b8aca89ace",
+      "seq_id": 3,
+      "source_id": 2,
+      "target_id": 4,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "f96435de-12b6-4425-a921-467654101db9",
+      "seq_id": 4,
+      "source_id": 4,
+      "target_id": 5,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "90d6558c-1f01-4484-bdb9-b643e8c8ea5f",
+      "seq_id": 5,
+      "source_id": 5,
+      "target_id": 6,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "d34caf0e-1426-43fb-bdc1-686072f0d8bd",
+      "seq_id": 6,
+      "source_id": 6,
+      "target_id": 7,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "487c52c6-7cfe-4d93-9009-43263ce01453",
+      "seq_id": 7,
+      "source_id": 7,
+      "target_id": 8,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "2f6b5540-6702-48f7-8f72-242b12eb1fba",
+      "seq_id": 8,
+      "source_id": 7,
+      "target_id": 14,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "74d558d7-ec29-430e-a973-c6fd111539c8",
+      "seq_id": 9,
+      "source_id": 7,
+      "target_id": 20,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "e576e710-ff70-4e05-b4a4-ffb04a117f8a",
+      "seq_id": 10,
+      "source_id": 7,
+      "target_id": 26,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "6ce0e826-84a2-4185-929e-3a01a9ae38f8",
+      "seq_id": 11,
+      "source_id": 8,
+      "target_id": 9,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "52a5177b-884a-4374-bf1c-d4d3756e1ef8",
+      "seq_id": 12,
+      "source_id": 12,
+      "target_id": 9,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "e1c18193-4648-4d17-895d-968e2e3bc5cb",
+      "seq_id": 13,
+      "source_id": 9,
+      "target_id": 10,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "71e4dd1d-be7d-45be-a1f2-0220ecce300e",
+      "seq_id": 14,
+      "source_id": 10,
+      "target_id": 11,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "844bd914-d011-4ae6-8ac1-b87eefd10c26",
+      "seq_id": 15,
+      "source_id": 11,
+      "target_id": 13,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "8812b551-b107-4bda-a2eb-3c00111bf975",
+      "seq_id": 16,
+      "source_id": 14,
+      "target_id": 15,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "8c49cac4-c4d2-49db-b30d-ff658673b105",
+      "seq_id": 17,
+      "source_id": 19,
+      "target_id": 15,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "960a6d31-158c-4e3d-929d-792d49b6df31",
+      "seq_id": 18,
+      "source_id": 15,
+      "target_id": 16,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "c93027ca-8f08-4ae6-90d2-ba7d0958c144",
+      "seq_id": 19,
+      "source_id": 16,
+      "target_id": 17,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "0afc4b82-9de7-47c7-a1b3-572ece2b15c1",
+      "seq_id": 20,
+      "source_id": 17,
+      "target_id": 18,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "fa61358a-5bf4-4a00-95e4-e332e502a1ec",
+      "seq_id": 21,
+      "source_id": 20,
+      "target_id": 21,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "e9783c96-3a09-4ecc-bc28-764a458a4ea3",
+      "seq_id": 22,
+      "source_id": 25,
+      "target_id": 21,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "414c6645-b053-4857-b23e-39529a80e054",
+      "seq_id": 23,
+      "source_id": 21,
+      "target_id": 22,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "2fc1935a-f65e-456c-b230-d0f614a68e90",
+      "seq_id": 24,
+      "source_id": 22,
+      "target_id": 23,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "ecec00c8-3711-4105-9b79-498d06b5e9d1",
+      "seq_id": 25,
+      "source_id": 23,
+      "target_id": 24,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "c54cc584-46f7-4f7e-9c82-bd0e0c027789",
+      "seq_id": 26,
+      "source_id": 26,
+      "target_id": 27,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "894cc79f-d3b0-4908-9a8c-457ba6d5e777",
+      "seq_id": 27,
+      "source_id": 31,
+      "target_id": 27,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "faa6b69d-c5a7-4966-8732-e4cb926bd98e",
+      "seq_id": 28,
+      "source_id": 27,
+      "target_id": 28,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "53c68d22-7e34-456f-a6a6-0b9f9d763aa2",
+      "seq_id": 29,
+      "source_id": 28,
+      "target_id": 29,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "5cb1cbff-335a-436b-99d2-fd895bcb29bc",
+      "seq_id": 30,
+      "source_id": 29,
+      "target_id": 30,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    },
+    {
+      "uuid": "98b63c91-c0a2-42ec-808f-11e9a7a95411",
+      "seq_id": 31,
+      "source_id": 5,
+      "target_id": 32,
+      "source_port": "bottom",
+      "target_port": "top",
+      "properties": {}
+    },
+    {
+      "uuid": "42ab0d2c-dce3-4efc-812d-c3feab925405",
+      "seq_id": 32,
+      "source_id": 13,
+      "target_id": 33,
+      "source_port": "right",
+      "target_port": "left",
+      "properties": {}
+    }
+  ],
+  "global_parameters": {},
+  "metadata": {
+    "version": "1.0",
+    "timestamp": 1779266174.7405465,
+    "component_count": 34,
+    "connection_count": 33
+  }
+}
