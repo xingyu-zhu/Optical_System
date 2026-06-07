@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
     QGraphicsView,
     QLabel,
     QMenu,
+    QComboBox,
     QShortcut,
     QTableWidget,
     QTableWidgetItem,
@@ -32,31 +33,96 @@ from PyQt5.QtWidgets import (
 from component_catalog import resolve_icon_path
 
 
+BOOLEAN_VALUES = {"true", "false"}
+
+
 DEFAULT_COMPONENT_PARAMS: dict[str, dict[str, list[str]]] = {
+    "DAC": {
+        "ElectricalBandwidth": ["32", "GHz", "电带宽"],
+        "Resolution": ["8", "bit", "量化位数"],
+    },
+    "Driver": {
+        "Gain": ["2", "dB", "驱动器增益"],
+        "NF": ["4", "dB", "噪声系数"],
+    },
+    "Modulator": {
+        "Vpi": ["3", "V", "半波电压"],
+        "Bandwidth": ["35", "GHz", "调制器电带宽"],
+    },
+    "LaserCW": {
+        "Power": ["13", "dBm", "平均输出光功率"],
+        "TransmitFrequency": ["193.1", "THz", "发射频率"],
+        "Linewidth": ["100", "kHz", "激光线宽"],
+        "RIN": ["-150", "dB/Hz", "相对强度噪声"],
+    },
+    "LO": {
+        "Power": ["13", "dBm", "本振光功率"],
+        "Linewidth": ["100", "kHz", "本振线宽"],
+        "FreqOffset": ["0.5", "GHz", "本振频偏"],
+        "Phase": ["0", "deg", "初始相位"],
+        "RIN": ["-150", "dB/Hz", "相对强度噪声"],
+    },
+    "Combiner": {
+        "Enabled": ["True", "", "是否启用"],
+        "Comment": ["", "", "备注"],
+    },
+    "VOA": {
+        "OutputPower": ["0", "dBm", "VOA的输出功率"],
+    },
+    "OA": {
+        "OutputPower": ["0", "dBm", "EDFA 输出功率"],
+        "NF": ["4", "dB", "噪声系数"],
+    },
+    "EDFA": {
+        "OutputPower": ["0", "dBm", "EDFA 输出功率"],
+        "NF": ["4", "dB", "噪声系数"],
+    },
     "Fiber": {
         "Length": ["20", "km", "光纤长度"],
-        "Attenuation": ["0.2", "dB/km", "衰减系数"],
+        "Attenuation": ["0.2", "dB/km", "插损/衰减系数"],
         "Dispersion": ["16.7", "ps/nm/km", "色散参数"],
+        "Nonlinearity": ["1.3", "1/W/km", "非线性系数"],
     },
     "ICR": {
-        "Responsivity": ["0.8", "A/W", "探测器响应度"],
-        "LO_Power": ["10", "dBm", "本振光功率"],
+        "Bandwidth": ["25", "GHz", "接收机带宽"],
+        "Responsivity": ["0.6", "A/W", "探测器响应度"],
+        "ThermalNoise": ["True", "", "启用热噪声"],
+        "ShotNoise": ["True", "", "启用散粒噪声"],
+        "DarkCurrent": ["10", "nA", "暗电流"],
+    },
+    "TIA": {
+        "Bandwidth": ["35", "GHz", "TIA 带宽"],
+        "Gain": ["2000", "Ohm", "跨阻增益"],
+    },
+    "ADC": {
+        "Bandwidth": ["59", "GHz", "ADC 模拟带宽"],
+        "Resolution": ["10", "bit", "量化位数"],
+        "SamplingRate": ["256", "GSa/s", "采样率"],
     },
     "OLTTxDSP": {
+        "TransmitFrequency": ["193.1", "THz", "发射频率"],
+        "BaudRate": ["6.25", "GBaud", "每子载波波特率"],
         "Modulation": ["16QAM", "", "调制格式"],
-        "SymbolRate": ["64", "GBaud", "符号率"],
+        "SymbolNumber": ["32768", "", "符号数"],
+        "NumBands": ["4", "", "发端子载波数量"],
     },
     "ONUTxDSP": {
-        "Modulation": ["16QAM", "", "调制格式"],
-        "SymbolRate": ["64", "GBaud", "符号率"],
+        "TransmitFrequency": ["193.1", "THz", "发射频率"],
+        "BaudRate": ["25", "GBaud", "上行 burst 波特率"],
+        "Modulation": ["QPSK", "", "调制格式"],
+        "SymbolNumber": ["32768", "", "符号数"],
+        "NumBands": ["Auto", "", "ONU数（由ONUTxDSP数量统计）"],
     },
     "ONURxDSP": {
+        "Modulation": ["16QAM", "", "调制格式"],
         "CD_Compensation": ["True", "", "色散补偿"],
         "Adaptive_EQ": ["True", "", "自适应均衡"],
     },
     "OLTRxDSP": {
+        "Modulation": ["QPSK", "", "调制格式"],
         "CD_Compensation": ["True", "", "色散补偿"],
         "Adaptive_EQ": ["True", "", "自适应均衡"],
+        "TargetONU": ["Auto", "", "上行目标 ONU 时隙"],
     },
 }
 
@@ -101,7 +167,19 @@ class ComponentParameterDialog(QDialog):
             key_item = QTableWidgetItem(k)
             key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(row, 0, key_item)
-            self.table.setItem(row, 1, QTableWidgetItem(str(value)))
+            if k == "Modulation":
+                combo = QComboBox(self.table)
+                combo.addItems(["QPSK", "16QAM"])
+                current = str(value).upper().replace("-", "")
+                combo.setCurrentText("QPSK" if current in {"QPSK", "4QAM"} else "16QAM")
+                self.table.setCellWidget(row, 1, combo)
+            elif self._is_boolean_value(value):
+                combo = QComboBox(self.table)
+                combo.addItems(["True", "False"])
+                combo.setCurrentText("True" if str(value).strip().lower() == "true" else "False")
+                self.table.setCellWidget(row, 1, combo)
+            else:
+                self.table.setItem(row, 1, QTableWidgetItem(str(value)))
             self.table.setItem(row, 2, QTableWidgetItem(str(unit)))
             self.table.setItem(row, 3, QTableWidgetItem(str(desc)))
 
@@ -109,11 +187,21 @@ class ComponentParameterDialog(QDialog):
         out: dict[str, list[str]] = {}
         for row in range(self.table.rowCount()):
             k = self.table.item(row, 0).text().strip()
-            value = self.table.item(row, 1).text().strip() if self.table.item(row, 1) else ""
+            widget = self.table.cellWidget(row, 1)
+            if isinstance(widget, QComboBox):
+                value = widget.currentText()
+            else:
+                value = self.table.item(row, 1).text().strip() if self.table.item(row, 1) else ""
             unit = self.table.item(row, 2).text().strip() if self.table.item(row, 2) else ""
             desc = self.table.item(row, 3).text().strip() if self.table.item(row, 3) else ""
             out[k] = [value, unit, desc]
         return out
+
+    @staticmethod
+    def _is_boolean_value(value) -> bool:
+        if isinstance(value, bool):
+            return True
+        return str(value).strip().lower() in BOOLEAN_VALUES
 
 
 class PortItem(QGraphicsEllipseItem):
@@ -361,14 +449,28 @@ class TopologyScene(QGraphicsScene):
     @staticmethod
     def _default_params(name: str) -> dict[str, list[str]]:
         name_lower = name.lower()
+        for key, v in DEFAULT_COMPONENT_PARAMS.items():
+            if key.lower() == name_lower:
+                return TopologyScene._copy_params(v)
         if "txdsp" in name_lower:
-            return dict(DEFAULT_COMPONENT_PARAMS.get("OLTTxDSP", {}))
+            return TopologyScene._copy_params(DEFAULT_COMPONENT_PARAMS.get("OLTTxDSP", {}))
         if "rxdsp" in name_lower:
-            return dict(DEFAULT_COMPONENT_PARAMS.get("ONURxDSP", {}))
+            return TopologyScene._copy_params(DEFAULT_COMPONENT_PARAMS.get("ONURxDSP", {}))
         for key, v in DEFAULT_COMPONENT_PARAMS.items():
             if key.lower() in name_lower:
-                return dict(v)
+                return TopologyScene._copy_params(v)
         return {"Enabled": ["True", "", "是否启用"], "Comment": ["", "", "备注"]}
+
+    @staticmethod
+    def _copy_params(params: dict[str, list[str]]) -> dict[str, list[str]]:
+        return {k: list(v) for k, v in params.items()}
+
+    @staticmethod
+    def _merge_with_default_params(name: str, params: dict | None) -> dict[str, list[str]]:
+        merged = TopologyScene._default_params(name)
+        for key, value in (params or {}).items():
+            merged[key] = list(value) if isinstance(value, list) else [str(value), "", ""]
+        return merged
 
     def selected_nodes(self) -> list[NodeItem]:
         return [i for i in self.selectedItems() if isinstance(i, NodeItem)]
@@ -468,7 +570,7 @@ class TopologyScene(QGraphicsScene):
             node_id = int(node_data["id"])
             name = node_data.get("name", f"Node{node_id}")
             icon_path = resolve_icon_path(name, node_data.get("icon_path", ""))
-            params = node_data.get("params") or self._default_params(name)
+            params = self._merge_with_default_params(name, node_data.get("params"))
             node = NodeItem(node_id, ComponentMeta(name=name, icon_path=icon_path, params=params))
 
             if has_xy:
@@ -570,6 +672,7 @@ class WorkspacePanel(QWidget):
 
     topology_changed = pyqtSignal(int, int)
     node_parameter_updated = pyqtSignal(int, dict)
+    analyzer_open_requested = pyqtSignal(int, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -616,7 +719,12 @@ class WorkspacePanel(QWidget):
         self._sc_paste.activated.connect(self.paste_selected)
 
     def _edit_node_parameters(self, node: NodeItem) -> None:
-        params = node.meta.params or self.scene._default_params(node.meta.name)
+        normalized = "".join(ch.lower() for ch in node.meta.name if ch.isalnum())
+        if "oanalyzer" in normalized or "eanalyzer" in normalized:
+            self.analyzer_open_requested.emit(node.node_id, node.meta.name)
+            return
+
+        params = self.scene._merge_with_default_params(node.meta.name, node.meta.params)
         dialog = ComponentParameterDialog(node.meta.name, params, parent=self)
         if dialog.exec_() == QDialog.Accepted:
             node.meta.params = dialog.get_params()
@@ -656,7 +764,7 @@ class WorkspacePanel(QWidget):
         for node_data in self._clipboard_nodes:
             pos = QPointF(center.x() + node_data["dx"] + 25, center.y() + node_data["dy"] + 25)
             node = self.scene.create_node(node_data["name"], node_data["icon_path"], pos)
-            node.meta.params = dict(node_data.get("params", {}))
+            node.meta.params = self.scene._merge_with_default_params(node.meta.name, node_data.get("params", {}))
             node.setSelected(True)
 
     def zoom_in(self) -> None:

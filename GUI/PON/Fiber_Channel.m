@@ -2,6 +2,16 @@
 function Rx_Sig = Fiber_Channel(Tx_Sig, Params)
     Fs = Params.Fs; L = Params.Fiber_L;
     D = Params.D; lambda = Params.lambda; c = Params.c;
+    if isfield(Params, 'Fiber') && isfield(Params.Fiber, 'Loss_dB_km')
+        Loss_dB_km = Params.Fiber.Loss_dB_km;
+    else
+        Loss_dB_km = 0;
+    end
+    if isfield(Params, 'Fiber') && isfield(Params.Fiber, 'Gamma')
+        Gamma = Params.Fiber.Gamma;
+    else
+        Gamma = 0;
+    end
     N_len = length(Tx_Sig(1,:));
     t_vec = (0:N_len-1) / Fs;
     
@@ -24,6 +34,16 @@ function Rx_Sig = Fiber_Channel(Tx_Sig, Params)
     Sig_Y_DGD = ifft(ifftshift( fftshift(fft(Sig_Y_CD)) .* H_DGD_Y ));
     
     Sig_DP = J * [Sig_X_DGD; Sig_Y_DGD];
+
+    if Gamma ~= 0
+        power_inst = sum(abs(Sig_DP).^2, 1);
+        Sig_DP = Sig_DP .* exp(1j * Gamma * L .* power_inst);
+    end
+
+    if Loss_dB_km ~= 0
+        loss_dB = Loss_dB_km * L / 1e3;
+        Sig_DP = Sig_DP .* 10.^(-loss_dB / 20);
+    end
     
     FO_Hz = Params.FO;
     LW = Params.LW;

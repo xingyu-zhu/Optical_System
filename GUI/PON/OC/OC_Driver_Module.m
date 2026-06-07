@@ -1,4 +1,4 @@
-function [rf_out_x, rf_out_y] = Driver_Module(rf_in_x, rf_in_y, Params)
+function [rf_out_x, rf_out_y] = OC_Driver_Module(rf_in_x, rf_in_y, Params)
 % Driver_Module: Simulates Electrical Driver
 %
 % Inputs:

@@ -14,6 +14,11 @@ function [IX, QX, IY, QY] = CoherentReceiver_load(E_Rx, E_LO, Params)
 
     %% 1. Unpack Parameters & Determine Actual Array Sampling Rate
     Rx_Obj = Params.Opt.Obj.Rx;
+    if isfield(Rx_Obj, 'PD') && isfield(Rx_Obj.PD, 'BandWidth') && ~isempty(Rx_Obj.PD.BandWidth)
+        ReceiverBandwidth = Rx_Obj.PD.BandWidth;
+    else
+        ReceiverBandwidth = 40e9;
+    end
     if isfield(Params, 'Fs_Tx')
         Fs = Params.Fs_Tx; 
     else
@@ -63,7 +68,7 @@ function [IX, QX, IY, QY] = CoherentReceiver_load(E_Rx, E_LO, Params)
     f_raw = (0:999)' * 100e6; 
     
     mag_base = zeros(size(f_raw));
-    mag_base(f_raw > 40e9) = -2.8 * ((f_raw(f_raw > 40e9) - 40e9) / 1e9); 
+    mag_base(f_raw > ReceiverBandwidth) = -2.8 * ((f_raw(f_raw > ReceiverBandwidth) - ReceiverBandwidth) / 1e9); 
     
     mag_raw_XI = mag_base + 0.4 * sin(2*pi*f_raw/4.5e9) - 0.6 + 0.1*randn(size(f_raw));
     mag_raw_XQ = mag_base + 0.6 * sin(2*pi*f_raw/5.2e9) - 0.8 + 0.1*randn(size(f_raw));

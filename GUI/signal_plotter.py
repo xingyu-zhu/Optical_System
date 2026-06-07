@@ -15,12 +15,15 @@ import numpy as np
 _MPL_CACHE = Path(__file__).resolve().parent / ".matplotlib_cache"
 _MPL_CACHE.mkdir(exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CACHE))
+os.environ.setdefault("XDG_CACHE_HOME", str(_MPL_CACHE))
 
 from matplotlib import pyplot as plt
 
 
 def _as_array(signal) -> np.ndarray:
     """Convert common Python/MATLAB-engine values to a numpy array."""
+    if signal is None:
+        return np.array([], dtype=float)
     arr = np.asarray(signal)
     if arr.dtype == object:
         arr = np.array(arr.tolist())
@@ -50,6 +53,124 @@ def _db_power(x: np.ndarray, floor_db: float = -120.0) -> np.ndarray:
     power = np.abs(x) ** 2
     power = power / max(np.max(power), np.finfo(float).eps)
     return np.maximum(10 * np.log10(power + np.finfo(float).eps), floor_db)
+
+
+def scalar_text(value) -> str:
+    """Format scalar or small vector MATLAB/Python values for result tables."""
+    arr = _as_array(value)
+    if arr.size == 0:
+        return "-"
+    if arr.size == 1:
+        val = arr.reshape(-1)[0]
+        try:
+            return f"{float(np.real(val)):.6g}"
+        except Exception:
+            return str(val)
+    try:
+        flat = arr.reshape(-1)
+        shown = ", ".join(f"{float(np.real(v)):.6g}" for v in flat[:4])
+        return shown + (" ..." if flat.size > 4 else "")
+    except Exception:
+        return str(value)
+
+
+def float_or_default(value, default: float) -> float:
+    """Return first numeric value or a default."""
+    arr = _as_array(value)
+    if arr.size:
+        try:
+            return float(np.real(arr.reshape(-1)[0]))
+        except Exception:
+            pass
+    return default
+
+
+def draw_spectrum(ax, signal, fs: float, title: str = "Electrical Spectrum") -> None:
+    """Draw centered normalized electrical spectrum on an existing axes."""
+    data = _as_channels(signal)
+    n = data.shape[0]
+    if n == 0:
+        ax.set_title(title)
+        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return
+    freq = _frequency_axis(n, fs)
+    for ch in range(data.shape[1]):
+        spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
+        ax.plot(freq / 1e9, _db_power(spectrum), linewidth=1.0, label=f"Ch{ch + 1}")
+
+    ax.set_title(title)
+    ax.set_xlabel("Frequency (GHz)")
+    ax.set_ylabel("Normalized Power (dB)")
+    ax.set_ylim(-90, 5)
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="best", fontsize=8)
+
+
+def draw_optical_spectrum(
+    ax,
+    optical_field,
+    fs: float,
+    center_frequency_hz: float | None = 193.1e12,
+    title: str = "Optical Spectrum",
+) -> None:
+    """Draw optical spectrum on an existing axes."""
+    data = _as_channels(optical_field)
+    n = data.shape[0]
+    if n == 0:
+        ax.set_title(title)
+        ax.text(0.5, 0.5, "No optical signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return
+    freq_offset = _frequency_axis(n, fs)
+    x = freq_offset if center_frequency_hz is None else center_frequency_hz + freq_offset
+    x_label = "Frequency Offset (GHz)" if center_frequency_hz is None else "Optical Frequency (THz)"
+    x_scale = 1e9 if center_frequency_hz is None else 1e12
+
+    for ch in range(data.shape[1]):
+        spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
+        ax.plot(x / x_scale, _db_power(spectrum), linewidth=1.0, label=f"Pol{ch + 1}")
+
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("Normalized Optical Power (dB)")
+    ax.set_ylim(-90, 5)
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="best", fontsize=8)
+
+
+def draw_constellation(
+    ax,
+    symbols,
+    max_points: int = 12000,
+    normalize: bool = True,
+    title: str = "Constellation",
+) -> None:
+    """Draw I/Q constellation on an existing axes."""
+    data = _as_channels(symbols)
+    if data.shape[0] == 0:
+        ax.set_title(title)
+        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return
+    for ch in range(data.shape[1]):
+        samples = data[:, ch].reshape(-1)
+        if max_points and samples.size > max_points:
+            samples = samples[:: max(1, samples.size // max_points)]
+        if normalize and samples.size:
+            rms = np.sqrt(np.mean(np.abs(samples) ** 2))
+            if rms > 0:
+                samples = samples / rms
+        ax.scatter(np.real(samples), np.imag(samples), s=5, alpha=0.35, edgecolors="none", label=f"Ch{ch + 1}")
+
+    ax.axhline(0, color="0.55", linewidth=0.8)
+    ax.axvline(0, color="0.55", linewidth=0.8)
+    ax.set_title(title)
+    ax.set_xlabel("In-phase")
+    ax.set_ylabel("Quadrature")
+    ax.grid(True, alpha=0.25)
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(loc="best", fontsize=8)
 
 
 def _finalize(fig, save_path: str | Path | None, show: bool):
@@ -103,21 +224,8 @@ def plot_spectrum(
     show: bool = False,
 ):
     """Plot centered normalized spectrum in dB, similar to MATLAB pwelch/fft views."""
-    data = _as_channels(signal)
-    n = data.shape[0]
-    freq = _frequency_axis(n, fs)
-
     fig, ax = plt.subplots(figsize=(8.5, 3.8))
-    for ch in range(data.shape[1]):
-        spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(freq / 1e9, _db_power(spectrum), linewidth=1.0, label=f"Ch{ch + 1}")
-
-    ax.set_title(title)
-    ax.set_xlabel("Frequency (GHz)")
-    ax.set_ylabel("Normalized Power (dB)")
-    ax.set_ylim(-90, 5)
-    ax.grid(True, alpha=0.25)
-    ax.legend(loc="best", fontsize=8)
+    draw_spectrum(ax, signal, fs, title=title)
     return _finalize(fig, save_path, show)
 
 
@@ -130,24 +238,8 @@ def plot_optical_spectrum(
     show: bool = False,
 ):
     """Plot optical spectrum using frequency offset or absolute optical frequency."""
-    data = _as_channels(optical_field)
-    n = data.shape[0]
-    freq_offset = _frequency_axis(n, fs)
-    x = freq_offset if center_frequency_hz is None else center_frequency_hz + freq_offset
-    x_label = "Frequency Offset (GHz)" if center_frequency_hz is None else "Optical Frequency (THz)"
-    x_scale = 1e9 if center_frequency_hz is None else 1e12
-
     fig, ax = plt.subplots(figsize=(8.5, 3.8))
-    for ch in range(data.shape[1]):
-        spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(x / x_scale, _db_power(spectrum), linewidth=1.0, label=f"Pol{ch + 1}")
-
-    ax.set_title(title)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("Normalized Optical Power (dB)")
-    ax.set_ylim(-90, 5)
-    ax.grid(True, alpha=0.25)
-    ax.legend(loc="best", fontsize=8)
+    draw_optical_spectrum(ax, optical_field, fs, center_frequency_hz=center_frequency_hz, title=title)
     return _finalize(fig, save_path, show)
 
 
@@ -160,24 +252,8 @@ def plot_constellation(
     show: bool = False,
 ):
     """Plot I/Q constellation for complex symbols or waveform samples."""
-    data = _as_array(symbols).reshape(-1)
-    if max_points and data.size > max_points:
-        step = max(1, data.size // max_points)
-        data = data[::step]
-    if normalize and data.size:
-        rms = np.sqrt(np.mean(np.abs(data) ** 2))
-        if rms > 0:
-            data = data / rms
-
     fig, ax = plt.subplots(figsize=(4.8, 4.8))
-    ax.scatter(np.real(data), np.imag(data), s=5, alpha=0.35, edgecolors="none")
-    ax.axhline(0, color="0.55", linewidth=0.8)
-    ax.axvline(0, color="0.55", linewidth=0.8)
-    ax.set_title(title)
-    ax.set_xlabel("In-phase")
-    ax.set_ylabel("Quadrature")
-    ax.grid(True, alpha=0.25)
-    ax.set_aspect("equal", adjustable="box")
+    draw_constellation(ax, symbols, max_points=max_points, normalize=normalize, title=title)
     return _finalize(fig, save_path, show)
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-1x4 multi-panel dumbbell plot (compressed height):
+1x4 multi-panel range dumbbell plot:
 - Remove y-axis
 - Put panel title on the left side
 - Keep x-axis in physical units
@@ -10,45 +10,76 @@
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+plt.rcParams.update({
+    "font.size": 24,
+    "font.weight": "bold",
+    "axes.labelweight": "bold",
+})
+
 PANELS = [
     {
         "title": "Compressive strength (MPa)",
-        "xlim": (0, 65),
-        "hydration": 32.0,
-        "carbonation": 56.0,
-        "literature_range": (25.0, 60.0),
+        "xlim": (0, 55),
+        "csh_range": (5.0, 10.0),
+        "carbonate_range": (20.0, 50.0),
         "fmt": "{:.1f}",
     },
     {
-        "title": "CO$_2$ uptake (wt%)",
-        "xlim": (0, 20),
-        "hydration": 4.2,
-        "carbonation": 16.8,
-        "literature_range": (2.0, 18.0),
+        "title": "CO$_2$ sequestration (%)",
+        "xlim": (0, 10),
+        "csh_range": (0.0, 0.5),
+        "carbonate_range": (6.0, 9.0),
         "fmt": "{:.1f}",
     },
     {
         "title": "Leachate pH",
-        "xlim": (8, 13),
-        "hydration": 11.9,
-        "carbonation": 9.6,
-        "literature_range": (9.2, 12.5),
+        "xlim": (8, 13.5),
+        "csh_range": (11.0, 13.0),
+        "carbonate_range": (9.0, 10.5),
         "fmt": "{:.1f}",
     },
     {
-        "title": "Porosity (%)",
-        "xlim": (0, 45),
-        "hydration": 31.0,
-        "carbonation": 24.0,
-        "literature_range": (18.0, 36.0),
+        "title": "MIP porosity (%)",
+        "xlim": (0, 35),
+        "csh_range": (5.0, 15.0),
+        "carbonate_range": (18.0, 25.0),
         "fmt": "{:.1f}",
     },
 ]
 
-C_HYD_EDGE = "#6b7280"   # hydration marker edge (gray)
-C_CARB = "#15803d"       # carbonation marker (green)
+C_CSH_EDGE = "#6b7280"   # C-S-H marker edge (gray)
+C_CARB = "#15803d"       # carbonate marker (green)
 C_CONNECT = "#d1d5db"    # dumbbell line
-C_RANGE = "#9ca3af"      # literature range
+
+
+def range_label(values, fmt):
+    left, right = values
+    return f"{fmt.format(left)}-{fmt.format(right)}"
+
+
+def draw_range(ax, values, y, marker_face, marker_edge, marker_width, fmt, label_offset=0.034):
+    left, right = values
+    ax.hlines(y, left, right, color=C_CONNECT, linewidth=5.2, zorder=1)
+    ax.scatter(
+        [left, right],
+        [y, y],
+        s=160,
+        facecolors=marker_face,
+        edgecolors=marker_edge,
+        linewidths=marker_width * 2,
+        clip_on=False,
+        zorder=3,
+    )
+    ax.text(
+        (left + right) / 2,
+        y + label_offset,
+        range_label(values, fmt),
+        ha="center",
+        va="bottom" if label_offset >= 0 else "top",
+        fontsize=23,
+        fontweight="bold",
+        color="black",
+    )
 
 
 def draw_panel(ax, panel):
@@ -56,66 +87,25 @@ def draw_panel(ax, panel):
     x0, x1 = panel["xlim"]
     xr = x1 - x0
 
-    # Literature range behind points
-    if panel.get("literature_range") is not None:
-        xmin, xmax = panel["literature_range"]
-        ax.hlines(y, xmin, xmax, color=C_RANGE, linewidth=1.8, alpha=0.35, zorder=1)
-
-    # Connector
-    ax.plot(
-        [panel["hydration"], panel["carbonation"]],
-        [y, y],
-        color=C_CONNECT,
-        linewidth=1.8,
-        zorder=2,
-    )
-
-    # Points
-    ax.scatter(
-        [panel["hydration"]],
-        [y],
-        s=52,
-        facecolors="white",
-        edgecolors=C_HYD_EDGE,
-        linewidths=1.5,
-        zorder=3,
-    )
-    ax.scatter(
-        [panel["carbonation"]],
-        [y],
-        s=52,
-        facecolors=C_CARB,
-        edgecolors=C_CARB,
-        linewidths=1.0,
-        zorder=3,
-    )
-
-    # Numeric labels (auto above/below to avoid overlap when points are close)
-    hv = panel["hydration"]
-    cv = panel["carbonation"]
-    close = abs(hv - cv) < 0.15 * xr
-    h_off = 0.09
-    c_off = -0.10 if not close else 0.09
-
     fmt = panel.get("fmt", "{:.2f}")
-    ax.text(hv, y + h_off, fmt.format(hv), ha="center", va="bottom", fontsize=9, color="black")
-    ax.text(cv, y + c_off, fmt.format(cv), ha="center", va="bottom" if c_off > 0 else "top", fontsize=9, color="black")
+    draw_range(ax, panel["csh_range"], y, "white", C_CSH_EDGE, 1.6, fmt, label_offset=0.034)
+    draw_range(ax, panel["carbonate_range"], y, C_CARB, C_CARB, 1.0, fmt, label_offset=0.034)
 
     # Left-side title (inside axes, near left edge)
     ax.text(
         x0 + 0.01 * xr,
-        0.145,
+        0.165,
         panel["title"],
         ha="left",
         va="bottom",
-        fontsize=10.5,
+        fontsize=28,
         fontweight="bold",
         color="black",
     )
 
     # Axes style
     ax.set_xlim(x0, x1)
-    ax.set_ylim(-0.16, 0.16)  # compressed panel height
+    ax.set_ylim(-0.15, 0.20)  # room for numeric labels and titles
     ax.set_yticks([])
 
     # Remove y-axis completely
@@ -126,16 +116,18 @@ def draw_panel(ax, panel):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_color("black")
-    ax.spines["bottom"].set_linewidth(1.0)
-    ax.tick_params(axis="x", colors="black", labelsize=9, width=1, length=3)
+    ax.spines["bottom"].set_linewidth(3.2)
+    ax.tick_params(axis="x", colors="black", labelsize=23, width=2.8, length=7.0)
+    for label in ax.get_xticklabels():
+        label.set_fontweight("bold")
 
 
 def main():
     # Compact overall figure height for 4 rows
     fig, axes = plt.subplots(
         4, 1,
-        figsize=(8.4, 6.4),
-        gridspec_kw={"hspace": 0.35}
+        figsize=(13.2, 12.0),
+        gridspec_kw={"hspace": 0.78}
     )
 
     for ax, panel in zip(axes, PANELS):
@@ -147,10 +139,10 @@ def main():
             marker="o",
             linestyle="None",
             markerfacecolor="white",
-            markeredgecolor=C_HYD_EDGE,
-            markeredgewidth=1.5,
-            markersize=6.8,
-            label="Hydration",
+            markeredgecolor=C_CSH_EDGE,
+            markeredgewidth=3.2,
+            markersize=13.6,
+            label="C-S-H based, without alkali activator",
         ),
         Line2D(
             [0], [0],
@@ -158,28 +150,22 @@ def main():
             linestyle="None",
             markerfacecolor=C_CARB,
             markeredgecolor=C_CARB,
-            markersize=6.8,
-            label="Carbonation",
-        ),
-        Line2D(
-            [0, 1], [0, 0],
-            color=C_RANGE,
-            linewidth=1.8,
-            alpha=0.35,
-            label="Literature range",
+            markersize=13.6,
+            label="Carbonate based, with 50 wt% inert skeleton wastes",
         ),
     ]
 
     fig.legend(
         handles=legend_handles,
         loc="lower center",
-        ncol=3,
+        ncol=1,
         frameon=False,
         bbox_to_anchor=(0.5, 0.005),
-        fontsize=9,
+        fontsize=24,
+        prop={"weight": "bold", "size": 24},
     )
 
-    fig.tight_layout(rect=(0.035, 0.055, 0.995, 1.0))
+    fig.subplots_adjust(left=0.055, right=0.995, top=0.965, bottom=0.22, hspace=0.78)
     fig.savefig("hydration_carbonation_dumbbell.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
     print("Saved: hydration_carbonation_dumbbell.pdf")

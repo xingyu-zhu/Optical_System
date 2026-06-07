@@ -9,13 +9,14 @@ from component_panel import ComponentPanel
 from matlab_engine_manager import MatlabEngineManager
 from matlab_topology_runner import MatlabTopologyRunner
 from output_widget import OutputWidget
+from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
 from workspace_panel import WorkspacePanel
 from topology_executor import TopologyCycleError, TopologyExecutor
 
 
 class MatlabTopologyWorker(QThread):
     log_message = pyqtSignal(str, str)
-    finished_ok = pyqtSignal()
+    finished_ok = pyqtSignal(object)
     failed = pyqtSignal(str)
 
     def __init__(self, engine_manager: MatlabEngineManager, topology: dict, parent=None):
@@ -29,8 +30,8 @@ class MatlabTopologyWorker(QThread):
                 self.engine_manager,
                 log=lambda message, source="INFO": self.log_message.emit(message, source),
             )
-            runner.run(self.topology)
-            self.finished_ok.emit()
+            outputs = runner.run(self.topology)
+            self.finished_ok.emit(outputs)
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -47,6 +48,9 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.engine_manager = engine_manager
         self._simulation_worker = None
+        self._latest_topology = None
+        self._latest_outputs = {}
+        self._analysis_windows = []
         self.setWindowTitle("多维复用超高速光网络仿真平台")
         self.resize(1280, 820)
 
@@ -107,7 +111,8 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self._make_action("重置缩放", "Ctrl+0", self.workspace_panel.reset_zoom))
 
         sim_menu = menu.addMenu("仿真")
-        sim_menu.addAction(self._make_action("运行拓扑仿真", "F5", self._run_topology_simulation))
+        sim_menu.addAction(self._make_action("拓扑仿真", "F5", self._run_topology_simulation))
+        sim_menu.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
         sim_menu.addAction(self._make_action("停止仿真", "Shift+F5", self._stub_action))
 
     def _create_tool_bars(self) -> None:
@@ -130,6 +135,7 @@ class MainWindow(QMainWindow):
 
         sim_tb = QToolBar("仿真", self)
         sim_tb.addAction(self._make_action("运行", None, self._run_topology_simulation))
+        sim_tb.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
         self.addToolBar(sim_tb)
 
     def _create_status_area(self, initial_engine_status: str) -> None:
@@ -147,6 +153,7 @@ class MainWindow(QMainWindow):
         self.output_widget.engine_status_changed.connect(self.update_engine_status)
         self.component_panel.component_selected.connect(self._on_component_selected)
         self.workspace_panel.topology_changed.connect(self._on_topology_changed)
+        self.workspace_panel.analyzer_open_requested.connect(self._show_analyzer_for_node)
         self.output_widget.log_python_output("GUI initialized.")
 
     def _make_action(self, text: str, shortcut: str | None, callback) -> QAction:
@@ -211,18 +218,85 @@ class MainWindow(QMainWindow):
             return
 
         topology = self.workspace_panel.scene.serialize()
+        self._latest_topology = topology
         self.status_label.setText("正在运行拓扑仿真")
 
         worker = MatlabTopologyWorker(self.engine_manager, topology, self)
         self._simulation_worker = worker
         worker.log_message.connect(lambda message, source: self.output_widget.append_message(message, source=source))
-        worker.finished_ok.connect(lambda: self.status_label.setText("拓扑仿真完成"))
+        worker.finished_ok.connect(self._on_topology_simulation_finished)
         worker.failed.connect(self._on_topology_simulation_failed)
         worker.start()
+
+    def _on_topology_simulation_finished(self, outputs: dict) -> None:
+        self._latest_outputs = outputs or {}
+        self.status_label.setText("拓扑仿真完成")
+        self.output_widget.append_message("拓扑仿真完成。双击光/电分析仪组件可查看对应结果。", source="INFO")
 
     def _on_topology_simulation_failed(self, message: str) -> None:
         self.output_widget.append_message(f"MATLAB run error: {message}", source="ERROR")
         self.status_label.setText("拓扑仿真失败")
+
+    def _show_analyzer_for_node(self, node_id: int, name: str) -> None:
+        normalized = "".join(ch.lower() for ch in name if ch.isalnum())
+        workspace = self._node_workspace(node_id)
+        if not workspace:
+            self.output_widget.append_message(
+                f"{name} 暂无可显示结果，请先运行拓扑仿真并确保该分析仪已连接信号。",
+                source="INFO",
+            )
+            return
+        if workspace.get("Status") != "called" or workspace.get("AnalyzerSignal") is None:
+            waiting_for = workspace.get("WaitingFor")
+            error = workspace.get("Error")
+            detail = f"等待: {waiting_for}" if waiting_for else (f"错误: {error}" if error else "无有效分析仪信号")
+            self.output_widget.append_message(
+                f"{name} 暂无可显示结果，{detail}。",
+                source="INFO",
+            )
+            return
+
+        if "oanalyzer" in normalized:
+            dialog = AnalyzerPlotDialog.optical(name, workspace, self)
+        elif "eanalyzer" in normalized:
+            dialog = AnalyzerPlotDialog.electrical(name, workspace, self)
+        else:
+            return
+
+        self._analysis_windows.append(dialog)
+        dialog.show()
+
+    def _show_simulation_results(self) -> None:
+        rows = []
+        topology = self._latest_topology or self.workspace_panel.scene.serialize()
+        node_names = {int(n.get("id")): str(n.get("name", "")) for n in topology.get("nodes", [])}
+
+        for node_id, outputs in (self._latest_outputs or {}).items():
+            workspace = self._workspace_from_outputs(outputs)
+            if workspace and ("SNR" in workspace or "BER" in workspace):
+                rows.append(
+                    {
+                        "node_id": node_id,
+                        "name": node_names.get(int(node_id), ""),
+                        "SNR": workspace.get("SNR"),
+                        "BER": workspace.get("BER"),
+                    }
+                )
+
+        dialog = SimulationResultDialog(rows, self)
+        self._analysis_windows.append(dialog)
+        dialog.show()
+
+    def _node_workspace(self, node_id: int) -> dict:
+        outputs = (self._latest_outputs or {}).get(node_id)
+        return self._workspace_from_outputs(outputs)
+
+    @staticmethod
+    def _workspace_from_outputs(outputs) -> dict:
+        if not isinstance(outputs, dict):
+            return {}
+        workspace = outputs.get("default") or outputs.get("right") or outputs.get("bottom") or outputs.get("info")
+        return workspace if isinstance(workspace, dict) else {}
 
     def _on_component_selected(self, name: str) -> None:
         self.status_label.setText(f"已选择组件: {name}")

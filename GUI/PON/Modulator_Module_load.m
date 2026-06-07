@@ -13,6 +13,11 @@ function [E_out] = Modulator_Module_load(E_Carrier, rf_in_x, rf_in_y, Params)
     %% 1. Unpack Parameters & System Sampling Rate
     MZM_Obj = Params.Opt.Obj.Tx.MZM;
     VpiDC   = MZM_Obj.VpiDC;
+    if isfield(MZM_Obj, 'Bandwidth') && ~isempty(MZM_Obj.Bandwidth)
+        ModulatorBandwidth = MZM_Obj.Bandwidth;
+    else
+        ModulatorBandwidth = 35e9;
+    end
     
     if isfield(Params, 'Fs_Tx')
         Fs = Params.Fs_Tx;
@@ -54,7 +59,7 @@ function [E_out] = Modulator_Module_load(E_Carrier, rf_in_x, rf_in_y, Params)
     f_raw = (0:999)' * 100e6; 
     
     mag_base = zeros(size(f_raw));
-    mag_base(f_raw > 35e9) = -2.5 * ((f_raw(f_raw > 35e9) - 35e9) / 1e9); 
+    mag_base(f_raw > ModulatorBandwidth) = -2.5 * ((f_raw(f_raw > ModulatorBandwidth) - ModulatorBandwidth) / 1e9); 
     
     mag_raw_XI = mag_base + 0.5 * sin(2*pi*f_raw/4e9)  - 0.5 + 0.1*randn(size(f_raw));
     mag_raw_XQ = mag_base + 0.8 * sin(2*pi*f_raw/5e9)  - 1.2 + 0.1*randn(size(f_raw));

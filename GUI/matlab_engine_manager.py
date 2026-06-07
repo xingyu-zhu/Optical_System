@@ -64,7 +64,7 @@ class MatlabEngineManager:
             return self._engine
 
     def _configure_project_paths(self) -> None:
-        """Add the local PON component library to MATLAB path."""
+        """Add the local PON component library and keep MATLAB plots headless."""
         if self._engine is None:
             return
 
@@ -74,6 +74,7 @@ class MatlabEngineManager:
 
         try:
             self._engine.addpath(self._engine.genpath(str(pon_dir)), nargout=0)
+            self._engine.eval("set(0, 'DefaultFigureVisible', 'off');", nargout=0)
         except Exception:
             # Path setup should not prevent the engine from starting.
             pass
