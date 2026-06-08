@@ -102,7 +102,7 @@ function ws = runTxDSP(ws, fn, Params)
         Params.ONUIndex = max(1, round(getContext(ws.Context, 'type_index', 1)));
         Params.Target_ONU = Params.ONUIndex;
         Params.ch = 1;
-        Params.cf = 0;
+        Params = applyUplinkFrequencyPlan(Params, ws.GUIParams, ws.Context);
     end
     [x_t, y_t, SigX, SigY, PAPR, sps] = feval(fn, Params);
     [rf_i, rf_q, ms] = OC_TxImbalance_Module(x_t, y_t, Params);
@@ -353,32 +353,60 @@ function ws = runRxDSP(ws, fn, Params)
             return;
         end
 
-        targetONU = resolveTargetONU(ws, Params);
-        Params.Target_ONU = targetONU;
-        Params.num_ONUs = max(targetONU, inferReferenceCount(SigX_Full, SigY_Full));
-        Params.ch = targetONU;
+        numONUs = max(1, inferReferenceCount(SigX_Full, SigY_Full));
+        if isfield(Params, 'TDM_StartIdx_Rx')
+            numONUs = max(numONUs, numel(Params.TDM_StartIdx_Rx));
+        end
+        Params.num_ONUs = numONUs;
         if numel(Params.cf) < 1
             Params.cf = 0;
         end
+        ws.Params = Params;
 
-        if isfield(Params, 'TDM_StartIdx_Rx') && isfield(Params, 'TDM_EndIdx_Rx') && ...
-                numel(Params.TDM_StartIdx_Rx) >= targetONU && numel(Params.TDM_EndIdx_Rx) >= targetONU
-            rxStart = max(1, round(Params.TDM_StartIdx_Rx(targetONU)));
-            rxEnd = min(numel(ws.Rx_Digital_X), round(Params.TDM_EndIdx_Rx(targetONU)));
-        else
-            rxStart = 1;
-            rxEnd = numel(ws.Rx_Digital_X);
+        snrList = nan(1, numONUs);
+        berList = nan(1, numONUs);
+        constellationList = cell(1, numONUs);
+
+        for onuIdx = 1:numONUs
+            ParamsONU = Params;
+            ParamsONU.Target_ONU = onuIdx;
+            ParamsONU.ch = onuIdx;
+
+            if isfield(Params, 'TDM_StartIdx_Rx') && isfield(Params, 'TDM_EndIdx_Rx') && ...
+                    numel(Params.TDM_StartIdx_Rx) >= onuIdx && numel(Params.TDM_EndIdx_Rx) >= onuIdx
+                rxStart = max(1, round(Params.TDM_StartIdx_Rx(onuIdx)));
+                rxEnd = min(numel(ws.Rx_Digital_X), round(Params.TDM_EndIdx_Rx(onuIdx)));
+            else
+                rxStart = 1;
+                rxEnd = numel(ws.Rx_Digital_X);
+            end
+
+            if rxEnd < rxStart
+                ws.Status = 'call_failed';
+                ws.Error = sprintf('Invalid uplink burst slice for ONU %d: [%d, %d].', onuIdx, rxStart, rxEnd);
+                return;
+            end
+
+            burstX = ws.Rx_Digital_X(rxStart:rxEnd);
+            burstY = ws.Rx_Digital_Y(rxStart:rxEnd);
+            [snrVal, berVal, resDataBurst] = feval(fn, burstX, burstY, SigX_Full, SigY_Full, ParamsONU);
+
+            snrList(onuIdx) = snrVal;
+            berList(onuIdx) = berVal;
+            if isstruct(resDataBurst) && isfield(resDataBurst, 'Constellation')
+                constellationList{onuIdx} = resDataBurst.Constellation(:);
+            end
+            fprintf('  Burst (ONU) #%d | SNR: %5.2f dB | BER: %.2e\n', onuIdx, snrVal, berVal);
         end
 
-        if rxEnd < rxStart
-            ws.Status = 'call_failed';
-            ws.Error = sprintf('Invalid uplink burst slice for ONU %d: [%d, %d].', targetONU, rxStart, rxEnd);
-            return;
+        ws.SNR = snrList;
+        ws.BER = berList;
+        ws.ResData = struct();
+        ws.ResData.Constellations = constellationList;
+        firstIdx = find(~cellfun(@isempty, constellationList), 1);
+        if ~isempty(firstIdx)
+            ws.ResData.Constellation = constellationList{firstIdx};
         end
-
-        burstX = ws.Rx_Digital_X(rxStart:rxEnd);
-        burstY = ws.Rx_Digital_Y(rxStart:rxEnd);
-        [ws.SNR, ws.BER, ws.ResData] = feval(fn, burstX, burstY, SigX_Full, SigY_Full, Params);
     else
         if ~isfield(ws, 'SigX') || ~isfield(ws, 'SigY')
             ws = waitFor(ws, 'SigX/SigY reference symbols');
@@ -393,6 +421,7 @@ function ws = runPowerMeter(ws, fn, Params)
     e = firstOpticalField(ws);
     if isempty(e), ws = waitFor(ws, 'signal field'); return; end
     [ws.Power_dBm, ws.Power_Watts] = feval(fn, e);
+    ws.PowerMeterKind = 'optical';
     ws.Status = 'called';
 end
 
@@ -400,20 +429,90 @@ function ws = runOpticalAnalyzer(ws, Params)
     e = firstOpticalField(ws);
     if isempty(e), ws = waitFor(ws, 'optical field'); return; end
     ws.AnalyzerKind = 'optical';
-    ws.AnalyzerSignal = normalizeOpticalNx2(e);
+    opticalSignal = normalizeOpticalNx2(e);
+    ws.AnalyzerSignal = opticalSignal;
     ws.AnalyzerFs = Params.Fs_Tx;
     ws.AnalyzerCenterFrequency = Params.c / Params.lambda;
+    [freqTHz, powerDbm] = opticalWelchEnvelope(opticalSignal, Params.Fs_Tx, ws.AnalyzerCenterFrequency);
+    if ~isempty(freqTHz)
+        ws.AnalyzerOpticalFrequencyTHz = freqTHz;
+        ws.AnalyzerOpticalPowerdBm = powerDbm;
+    end
     ws.Status = 'called';
 end
 
 function ws = runElectricalAnalyzer(ws, Params)
-    [sig, label, fs] = firstElectricalField(ws, Params);
+    [sig, label, fs, constellation] = firstElectricalField(ws, Params);
     if isempty(sig), ws = waitFor(ws, 'electrical signal'); return; end
     ws.AnalyzerKind = 'electrical';
     ws.AnalyzerSignal = sig;
     ws.AnalyzerSignalLabel = label;
     ws.AnalyzerFs = fs;
+    [freqGHz, psdDbHz] = electricalWelchSpectrum(sig, fs);
+    if ~isempty(freqGHz)
+        ws.AnalyzerSpectrumFrequencyGHz = freqGHz;
+        ws.AnalyzerSpectrumPSDdBHz = psdDbHz;
+    end
+    if ~isempty(constellation)
+        ws.AnalyzerConstellation = constellation;
+    end
     ws.Status = 'called';
+end
+
+function [freqGHz, psdDbHz] = electricalWelchSpectrum(sig, fs)
+    freqGHz = [];
+    psdDbHz = [];
+    if isempty(sig) || isempty(fs) || ~isfinite(fs) || fs <= 0
+        return;
+    end
+    nfft = 2^15;
+    try
+        if size(sig, 2) == 1
+            [psdTotal, f] = pwelch(sig(:, 1), [], [], nfft, fs, 'centered');
+        else
+            [psdX, f] = pwelch(sig(:, 1), [], [], nfft, fs, 'centered');
+            [psdY, ~] = pwelch(sig(:, 2), [], [], nfft, fs, 'centered');
+            psdTotal = psdX + psdY;
+        end
+        freqGHz = f(:) / 1e9;
+        psdDbHz = 10 * log10(psdTotal(:) + eps);
+    catch
+        freqGHz = [];
+        psdDbHz = [];
+    end
+end
+
+function [freqTHz, powerDbm] = opticalWelchEnvelope(opticalSignal, fs, centerFrequency)
+    freqTHz = [];
+    powerDbm = [];
+    if isempty(opticalSignal) || isempty(fs) || ~isfinite(fs) || fs <= 0
+        return;
+    end
+    if isempty(centerFrequency) || ~isfinite(centerFrequency) || centerFrequency <= 0
+        centerFrequency = 193.1e12;
+    end
+
+    nfft = 2^16;
+    try
+        sig = normalizeOpticalNx2(opticalSignal);
+        if size(sig, 2) == 1
+            [psdTotal, f] = pwelch(sig(:, 1), [], [], nfft, fs, 'centered');
+        else
+            [psdX, f] = pwelch(sig(:, 1), [], [], nfft, fs, 'centered');
+            [psdY, ~] = pwelch(sig(:, 2), [], [], nfft, fs, 'centered');
+            psdTotal = psdX + psdY;
+        end
+
+        df = fs / nfft;
+        powerRawDbm = 10 * log10(psdTotal(:) * df + eps) + 30;
+        winMax = 300;
+        winSmooth = 600;
+        powerDbm = movmean(movmax(powerRawDbm, winMax), winSmooth);
+        freqTHz = (f(:) + centerFrequency) / 1e12;
+    catch
+        freqTHz = [];
+        powerDbm = [];
+    end
 end
 
 function ws = mergeInputWorkspaces(inputs)
@@ -461,24 +560,28 @@ function Params = buildDefaultParams(guiParams, context)
         Params.num_bands = 1;
     end
     Params.TotalBaudRate = Params.BaudRate * Params.num_bands;
-    Params.rolloff = getParam(guiParams, 'rolloff', 0.1);
+    if usesUplinkFrequencyPlan(context)
+        Params.rolloff = getParam(guiParams, 'rolloff', 0.1);
+    else
+        Params.rolloff = getParam(guiParams, 'rolloff', 0.01);
+    end
     Params.span = getParam(guiParams, 'span', 128);
     Params.sps = getParam(guiParams, 'sps', 2);
     Params.deltafs = getParam(guiParams, 'deltafs', 0.5e9);
-    Params.SPPR = getParam(guiParams, 'SPPR', 30);
+    if usesUplinkFrequencyPlan(context)
+        Params.SPPR = getParam(guiParams, 'SPPR', 50);
+    else
+        Params.SPPR = getParam(guiParams, 'SPPR', 30);
+    end
     Params.ER = getParam(guiParams, 'ER', 50);
     Params.DAC_BW_Analog = ghzParam(guiParams, {'ElectricalBandwidth', 'DAC_BW_Analog'}, 32e9);
     Params.ADC_BW_Analog = ghzParam(guiParams, {'Bandwidth', 'ADC_BW_Analog'}, 59e9);
     Params.TIA_Gain = getParamAny(guiParams, {'Gain', 'TIA_Gain'}, 2e3);
     Params.TIA_BandWidth = ghzParam(guiParams, {'Bandwidth', 'TIA_BandWidth'}, 35e9);
     Params.scbw = Params.BaudRate * (1 + Params.rolloff) / 2;
-    Params.grdbw = getParam(guiParams, 'grdbw', 2e9);
+    Params.grdbw = getParam(guiParams, 'grdbw', 1e9);
     Params.cf = buildCarrierOffsets(Params.num_bands, Params.scbw, Params.grdbw);
-    if isUplinkComponent(context)
-        Params.cf = 0;
-        Params.grdbw = 1e9;
-        Params.scbw = Params.BaudRate * (1 + Params.rolloff) / 2;
-    end
+    Params = applyUplinkFrequencyPlan(Params, guiParams, context);
 
     Params = seedDemoConfigStructs(Params, guiParams);
     if exist('OC_DefineOpt_platform', 'file') == 2
@@ -557,6 +660,41 @@ function tf = isUplinkComponent(context)
         componentType = lower(char(context.component_type));
     end
     tf = strcmp(componentType, 'onutxdsp') || strcmp(componentType, 'oltrxdsp');
+end
+
+function tf = usesUplinkFrequencyPlan(context)
+    componentType = '';
+    downstreamRxType = '';
+    if isstruct(context)
+        if isfield(context, 'component_type')
+            componentType = lower(char(context.component_type));
+        end
+        if isfield(context, 'downstream_rx_type')
+            downstreamRxType = lower(char(context.downstream_rx_type));
+        end
+    end
+    tf = strcmp(componentType, 'onutxdsp') || strcmp(componentType, 'oltrxdsp') || ...
+        strcmp(downstreamRxType, 'oltrxdsp');
+end
+
+function Params = applyUplinkFrequencyPlan(Params, guiParams, context)
+    if ~usesUplinkFrequencyPlan(context)
+        return;
+    end
+
+    % Match PON/DEMO_model_ONU_Tx.m uplink SC plan:
+    % QPSK single-carrier burst at baseband, 1 GHz guard metadata, and
+    % 0.5 GHz global LO offset handled by the coherent receiver path.
+    Params.num_bands = 1;
+    Params.TotalBaudRate = Params.BaudRate;
+    Params.rolloff = getParam(guiParams, 'rolloff', 0.1);
+    Params.span = getParam(guiParams, 'span', 128);
+    Params.scbw = Params.BaudRate * (1 + Params.rolloff) / 2;
+    Params.grdbw = getParam(guiParams, 'grdbw', 1e9);
+    Params.cf = buildUplinkCarrierOffset(guiParams);
+    Params.deltafs = getParam(guiParams, 'deltafs', 0.5e9);
+    Params.FO = getParam(guiParams, 'FO', Params.deltafs);
+    Params.SPPR = getParam(guiParams, 'SPPR', 50);
 end
 
 function Params = attachUplinkPreambleParams(Params)
@@ -951,19 +1089,25 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
     branches = branches(order);
 
     numONUs = numel(branches);
-    burstSamples = size(branches{1}.field, 1);
-    polCount = size(branches{1}.field, 2);
+    burstLengths = zeros(1, numONUs);
+    polCount = 0;
+    for k = 1:numONUs
+        burstLengths(k) = size(branches{k}.field, 1);
+        polCount = max(polCount, size(branches{k}.field, 2));
+    end
     guardSamples = round(safeGet(Params, {'Guard_Time'}, 2e-6) * Params.Fs_Tx);
-    totalLength = numONUs * burstSamples + (numONUs - 1) * guardSamples;
+    totalLength = sum(burstLengths) + (numONUs - 1) * guardSamples;
 
     frame = zeros(totalLength, polCount);
     sigXFull = cell(1, numONUs);
     sigYFull = cell(1, numONUs);
     tdmStart = zeros(1, numONUs);
     tdmEnd = zeros(1, numONUs);
+    cursor = 1;
 
     for k = 1:numONUs
-        startIdx = (k - 1) * (burstSamples + guardSamples) + 1;
+        burstSamples = burstLengths(k);
+        startIdx = cursor;
         endIdx = startIdx + burstSamples - 1;
         field = normalizeOpticalNx2(branches{k}.field);
         frame(startIdx:endIdx, :) = alignRows(field, burstSamples);
@@ -971,6 +1115,7 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
         sigYFull{k} = firstReferenceBand(branches{k}.sigY);
         tdmStart(k) = round((startIdx - 1) / Params.Fs_Tx * Params.Fs_Rx) + 1;
         tdmEnd(k) = round((endIdx - 1) / Params.Fs_Tx * Params.Fs_Rx) + 1;
+        cursor = endIdx + guardSamples + 1;
     end
 
     meta.SigX_Full = sigXFull;
@@ -978,7 +1123,8 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
     meta.Params = copyUplinkBaseParams(branches{1}.params);
     meta.Params.num_ONUs = numONUs;
     meta.Params.num_bands = 1;
-    meta.Params.Burst_Samples = burstSamples;
+    meta.Params.Burst_Samples = max(burstLengths);
+    meta.Params.Burst_Samples_Per_ONU = burstLengths;
     meta.Params.Guard_Time = safeGet(Params, {'Guard_Time'}, 2e-6);
     meta.Params.Guard_Samples = guardSamples;
     meta.Params.TDM_StartIdx_Rx = tdmStart;
@@ -997,7 +1143,7 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
         meta.Params.Overhead_Samples_Tx = length(resample(zeros(320,1), Params.Fs_Tx, Params.BaudRate));
     end
     meta.Params.Overhead_Samples_Rx = round(meta.Params.Overhead_Samples_Tx * Params.Fs_Rx / Params.Fs_Tx);
-    meta.Debug = struct('Mode', 'uplink_tdm', 'num_ONUs', numONUs, 'burst_samples', burstSamples, 'guard_samples', guardSamples);
+    meta.Debug = struct('Mode', 'uplink_tdm', 'num_ONUs', numONUs, 'burst_samples', burstLengths, 'guard_samples', guardSamples);
     ok = true;
 end
 
@@ -1009,7 +1155,7 @@ function out = copyUplinkBaseParams(params)
     fields = {'Fs_Tx', 'Fs_Rx', 'Fs', 'BaudRate', 'M', 'symbolnum', 'num_bands', ...
         'num_ONUs', 'rolloff', 'span', 'sps', 'deltafs', 'SPPR', 'scbw', ...
         'grdbw', 'cf', 'ER', 'RandSeed', 'c_const', 'lambda', 'c', ...
-        'EmissionFrequency'};
+        'EmissionFrequency', 'Burst_Samples_Per_ONU'};
     out = copyFields(out, params, fields);
 end
 
@@ -1129,10 +1275,30 @@ end
 
 function cf = buildCarrierOffsets(numBands, scbw, grdbw)
     numBands = max(1, round(numBands));
-    span = 2 * ceil(numBands / 2);
-    slots = [-span:2:-2, 2:2:span];
+    span = ceil(numBands / 2) + 1;
+    slots = [-span:2:-1, 1:2:span];
     idx = slots(1:numBands);
-    cf = idx * scbw + sign(idx) * grdbw;
+    cf = idx * scbw + idx * grdbw;
+end
+
+function cf = buildUplinkCarrierOffset(guiParams)
+    % Match the uplink frequency plan in PON/DEMO_model_ONU_Tx.m:
+    % single-carrier QPSK burst at baseband, with the 0.5 GHz global LO
+    % offset handled by Params.deltafs / receiver LO tuning.
+    cf = getParam(guiParams, 'cf', []);
+    if isempty(cf)
+        cf = 0;
+    end
+    cf = cf(:).';
+    if isempty(cf)
+        cf = 0;
+    end
+    if numel(cf) > 1
+        cf = cf(1);
+    end
+    if ~isfinite(cf)
+        cf = 0;
+    end
 end
 
 function Params = configureDemoLOParams(Params, ws)
@@ -1256,16 +1422,14 @@ function fields = collectOpticalInputs(ws)
     end
 end
 
-function [sig, label, fs] = firstElectricalField(ws, Params)
+function [sig, label, fs, constellation] = firstElectricalField(ws, Params)
     sig = [];
     label = '';
     fs = Params.Fs_Tx;
+    constellation = [];
     if isfield(ws, 'ResData') && isstruct(ws.ResData) && ...
             isfield(ws.ResData, 'Constellation') && ~isempty(ws.ResData.Constellation)
-        sig = ws.ResData.Constellation(:);
-        label = 'Rx DSP';
-        fs = Params.BaudRate;
-        return;
+        constellation = ws.ResData.Constellation(:);
     end
     pairs = {
         'Rx_Digital_X', 'Rx_Digital_Y', 'Rx Digital', Params.Fs_Rx;
@@ -1284,6 +1448,12 @@ function [sig, label, fs] = firstElectricalField(ws, Params)
             fs = pairs{k, 4};
             return;
         end
+    end
+    if ~isempty(constellation)
+        sig = constellation;
+        label = 'Rx DSP Constellation';
+        fs = Params.BaudRate;
+        return;
     end
     if isfield(ws, 'IX') && isfield(ws, 'QX') && isfield(ws, 'IY') && isfield(ws, 'QY')
         sig = [complex(ws.IX(:), ws.QX(:)), complex(ws.IY(:), ws.QY(:))];
@@ -1411,8 +1581,11 @@ end
 function compact = compactWorkspaceForCache(ws)
     compact = struct();
     alwaysKeep = {'Component', 'MatlabFunction', 'GUIParams', 'Context', 'Params', ...
-        'Status', 'WaitingFor', 'Error', 'SNR', 'BER', 'AnalyzerKind', ...
-        'AnalyzerFs', 'AnalyzerCenterFrequency', 'AnalyzerSignalLabel'};
+        'Status', 'WaitingFor', 'Error', 'SNR', 'BER', 'PowerMeterKind', ...
+        'Power_dBm', 'Power_Watts', 'AnalyzerKind', ...
+        'AnalyzerFs', 'AnalyzerCenterFrequency', 'AnalyzerSignalLabel', ...
+        'AnalyzerSpectrumFrequencyGHz', 'AnalyzerSpectrumPSDdBHz', ...
+        'AnalyzerOpticalFrequencyTHz', 'AnalyzerOpticalPowerdBm'};
     compact = copyFields(compact, ws, alwaysKeep);
 
     key = lower(regexprep(char(safeGet(ws, {'Component'}, '')), '[^a-zA-Z0-9]', ''));
@@ -1436,9 +1609,19 @@ function compact = compactWorkspaceForCache(ws)
     elseif contains(key, 'adc')
         compact = copyFields(compact, ws, {'Rx_Digital_X', 'Rx_Digital_Y'});
     elseif contains(key, 'rxdsp')
-        compact = copyFields(compact, ws, {'ResData'});
+        compact = copyFields(compact, ws, {'Rx_Digital_X', 'Rx_Digital_Y', 'ResData'});
+    elseif contains(key, 'powermeter')
+        compact = copyFields(compact, ws, {'SigX', 'SigY', 'SigX_Full', 'SigY_Full', ...
+            'x_t', 'y_t', 'rf_i', 'rf_q', 'rf_x', 'rf_y', ...
+            'rfall_x', 'rfall_y', 'rf_in_x', 'rf_in_y', 'rf_out_x', 'rf_out_y', ...
+            'E_Carrier', 'E_LO', 'E_LO_Rot', 'E_out', 'E_Rx', 'E_Total', ...
+            'E_Tx_Out', 'E_Tx_ONU', 'Output_Ports', ...
+            'IX', 'QX', 'IY', 'QY', 'Rx_Analog_X', 'Rx_Analog_Y', ...
+            'Rx_Digital_X', 'Rx_Digital_Y', 'Power_dBm', 'Power_Watts'});
     elseif contains(key, 'analyzer')
-        compact = copyFields(compact, ws, {'AnalyzerSignal'});
+        compact = copyFields(compact, ws, {'AnalyzerSignal', 'AnalyzerConstellation', ...
+            'AnalyzerSpectrumFrequencyGHz', 'AnalyzerSpectrumPSDdBHz', ...
+            'AnalyzerOpticalFrequencyTHz', 'AnalyzerOpticalPowerdBm'});
     end
 end
 
@@ -1446,8 +1629,10 @@ function summary = lightweightWorkspaceSummary(ws, ref)
     summary = struct();
     summary.OCRef = ref;
     keep = {'Component', 'MatlabFunction', 'Status', 'WaitingFor', 'Error', ...
-        'SNR', 'BER', 'AnalyzerKind', 'AnalyzerFs', 'AnalyzerCenterFrequency', ...
-        'AnalyzerSignalLabel'};
+        'SNR', 'BER', 'PowerMeterKind', 'Power_dBm', 'Power_Watts', ...
+        'AnalyzerKind', 'AnalyzerFs', 'AnalyzerCenterFrequency', ...
+        'AnalyzerSignalLabel', 'AnalyzerSpectrumFrequencyGHz', 'AnalyzerSpectrumPSDdBHz', ...
+        'AnalyzerOpticalFrequencyTHz', 'AnalyzerOpticalPowerdBm'};
     summary = copyFields(summary, ws, keep);
 
     if isfield(ws, 'Params') && isstruct(ws.Params)
@@ -1455,11 +1640,17 @@ function summary = lightweightWorkspaceSummary(ws, ref)
     end
 
     if isfield(ws, 'AnalyzerSignal') && ~isempty(ws.AnalyzerSignal)
-        summary.AnalyzerSignal = decimateForGui(ws.AnalyzerSignal, 12000);
+        [summary.AnalyzerSignal, summary.AnalyzerSignalSampleStep] = decimateForGui(ws.AnalyzerSignal, 12000);
         summary.AnalyzerSignalSamples = size(ws.AnalyzerSignal, 1);
     end
 
-    if isfield(ws, 'ResData') && isstruct(ws.ResData) && isfield(ws.ResData, 'Constellation')
+    if isfield(ws, 'AnalyzerConstellation') && ~isempty(ws.AnalyzerConstellation)
+        summary.AnalyzerConstellation = decimateForGui(ws.AnalyzerConstellation, 12000);
+    end
+
+    if isfield(ws, 'ResData') && isstruct(ws.ResData) && isfield(ws.ResData, 'Constellations')
+        summary.ConstellationPreviews = decimateForGui(ws.ResData.Constellations, 12000);
+    elseif isfield(ws, 'ResData') && isstruct(ws.ResData) && isfield(ws.ResData, 'Constellation')
         summary.ConstellationPreview = decimateForGui(ws.ResData.Constellation, 12000);
     end
 
@@ -1482,13 +1673,21 @@ function params = summarizeParams(p)
     params = copyFields(params, p, keep);
 end
 
-function out = decimateForGui(data, maxRows)
+function [out, step] = decimateForGui(data, maxRows)
+    step = 1;
     if isempty(data)
         out = data;
         return;
     end
     if isstruct(data)
         out = data;
+        return;
+    end
+    if iscell(data)
+        out = cell(size(data));
+        for k = 1:numel(data)
+            out{k} = decimateForGui(data{k}, maxRows);
+        end
         return;
     end
     rows = size(data, 1);

@@ -8,7 +8,6 @@ function [rf_out_x, rf_out_y] = Driver_Module(rf_in_x, rf_in_y, Params)
 %                      - Params.Fs_Tx
 %                      - Params.Driver.Bandwidth (Hz)
 %                      - Params.Driver.Gain_dB (dB)
-%                      - Params.Driver.NF_dB (dB)
 %
 % Outputs:
 %   rf_out_x, rf_out_y : Amplified and Filtered signals (Complex formatted same as input)
@@ -17,11 +16,6 @@ function [rf_out_x, rf_out_y] = Driver_Module(rf_in_x, rf_in_y, Params)
     Fs_Tx   = Params.Fs_Tx;
     BW      = Params.Driver.Bandwidth;
     Gain_dB = Params.Driver.Gain_dB;
-    if isfield(Params.Driver, 'NF_dB')
-        NF_dB = Params.Driver.NF_dB;
-    else
-        NF_dB = 0;
-    end
 
     % Calculate Linear Gain
     Gain_Lin = 10^(Gain_dB / 20);
@@ -54,14 +48,6 @@ function [rf_out_x, rf_out_y] = Driver_Module(rf_in_x, rf_in_y, Params)
     rf1_y_out = sig_y1_filt * Gain_Lin;
     rf2_y_out = sig_y2_filt * Gain_Lin;
 
-    if NF_dB > 0
-        noiseScale = sqrt(max(10^(NF_dB / 10) - 1, 0)) * 1e-3;
-        rf1_x_out = rf1_x_out + rmsOrOne(rf1_x_out) * noiseScale * randn(size(rf1_x_out));
-        rf2_x_out = rf2_x_out + rmsOrOne(rf2_x_out) * noiseScale * randn(size(rf2_x_out));
-        rf1_y_out = rf1_y_out + rmsOrOne(rf1_y_out) * noiseScale * randn(size(rf1_y_out));
-        rf2_y_out = rf2_y_out + rmsOrOne(rf2_y_out) * noiseScale * randn(size(rf2_y_out));
-    end
-
     %% 5. Recombine and Plot
     rf_out_x = complex(rf1_x_out, rf2_x_out);
     rf_out_y = complex(rf1_y_out, rf2_y_out);
@@ -71,11 +57,4 @@ function [rf_out_x, rf_out_y] = Driver_Module(rf_in_x, rf_in_y, Params)
 %     pwelch([rf1_x_out, rf2_x_out], [], [], [], Fs_Tx, 'centered'); 
 %     title('Driver Output Spectrum (Amplified & Filtered)');
 
-end
-
-function out = rmsOrOne(x)
-    out = sqrt(mean(abs(x(:)).^2));
-    if ~isfinite(out) || out == 0
-        out = 1;
-    end
 end

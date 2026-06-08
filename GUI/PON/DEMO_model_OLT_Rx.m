@@ -1,4 +1,4 @@
-function [SNR, BER, ResData] = DEMO_model_OLT_Rx(Params, E_Total, SigX_Full, SigY_Full, Target_ONU)
+function [SNR_List, BER_List, Constellations_List] = DEMO_model_OLT_Rx(Params, E_Total, SigX_Full, SigY_Full)
 %% ================== 3. Channel & Receiver (OLT Side) ==================
 fprintf('\n=== Running Fiber & OLT Receiver ===\n');
 
@@ -34,25 +34,25 @@ TimeVector_LO = (0:length(E_Rx_Amp)-1).' / Params.Fs_Tx;
 [ICR_In_dBm, ~] = PowerMeter_Module(E_Rx_Amp);
 fprintf('  > ROP (before VOA): %.2f dBm\n', ICR_In_dBm);
 
-    if isfield(Params, 'Target_ROP')
-        Target_ROP = Params.Target_ROP;
-    else
-        Target_ROP = -25;
-    end
-    fprintf('\n--- Target ROP = %.2f dBm ---\n', Target_ROP);
-    
-    % 1. Calculate Required Attenuation (VOA)
-    Required_Att_dB = ICR_In_dBm - Target_ROP;
-    
-    if Required_Att_dB < 0
-        warning('Target ROP (%.2f dBm) is higher than available power (%.2f dBm). VOA set to 0dB.', Target_ROP, ICR_In_dBm);
-        Required_Att_dB = 0;
-    end
-    
-    % Apply VOA
-    Params.Opt.Obj.VOA.Attenuation = Required_Att_dB;
-    Params.Opt.Obj.VOA.Active = 'On';
-    [E_Rx_Adjusted, ~] = VOA_Module(E_Rx_Amp, Params);
+if isfield(Params, 'Target_ROP')
+    Target_ROP = Params.Target_ROP;
+else
+    Target_ROP = -25;
+end
+fprintf('\n--- Target ROP = %.2f dBm ---\n', Target_ROP);
+
+% 1. Calculate Required Attenuation (VOA)
+Required_Att_dB = ICR_In_dBm - Target_ROP;
+
+if Required_Att_dB < 0
+    warning('Target ROP (%.2f dBm) is higher than available power (%.2f dBm). VOA set to 0dB.', Target_ROP, ICR_In_dBm);
+    Required_Att_dB = 0;
+end
+
+% Apply VOA
+Params.Opt.Obj.VOA.Attenuation = Required_Att_dB;
+Params.Opt.Obj.VOA.Active = 'On';
+[E_Rx_Adjusted, ~] = VOA_Module(E_Rx_Amp, Params);
 
 [IX, QX, IY, QY] = CoherentReceiver_Module(E_Rx_Adjusted, E_LO_Rot, Params);
 
@@ -69,72 +69,61 @@ Rx_Digital_Y = Rx_Digital_Y / sqrt(mean(abs(Rx_Digital_Y).^2));
 
 % ================== 绘制收端 ADC 采样后的 TDM 时域与频谱 ==================
 persistent Plotted_ADC_Uplink;
-if isempty(Plotted_ADC_Uplink)
-    Plotted_ADC_Uplink = false;
-end
+if isempty(Plotted_ADC_Uplink), Plotted_ADC_Uplink = false; end
 
 if ~Plotted_ADC_Uplink
-    if ~exist(fullfile('img', 'up'), 'dir')
-        mkdir(fullfile('img', 'up'));
-    end
+    if ~exist(fullfile('img', 'up'), 'dir'), mkdir(fullfile('img', 'up')); end
 
-    fig_rx_adc = figure('Name', 'TDM Signal Analysis (Rx Side After ADC)', 'Position', [100, 200, 1500, 400], 'Color', 'w');
-
-    % 1. 绘制完整的全局帧结构波形
+    fig_rx_adc = figure('Name', 'TDM Signal Analysis (Rx Side After ADC)', 'Position', [100, 200, 1500, 400], 'Color', 'w', 'Visible', 'off');
     subplot(1, 2, 1);
     t_vec_rx = (0:length(Rx_Digital_X)-1) / Params.Fs_Rx * 1e9; 
-    Waveform_Rx = real(Rx_Digital_X); 
-    plot(t_vec_rx, Waveform_Rx, 'Color', [0 0.447 0.741]);
-    title('接收端时域波形');
-    xlabel('Time (ns)'); ylabel('Amplitude (a.u.)');
-    grid on; if ~isempty(t_vec_rx), xlim([0, t_vec_rx(end)]); end
+    plot(t_vec_rx, real(Rx_Digital_X), 'Color', [0 0.447 0.741]);
+    title('接收端时域波形'); xlabel('Time (ns)'); ylabel('Amplitude (a.u.)'); grid on; if ~isempty(t_vec_rx), xlim([0, t_vec_rx(end)]); end
 
-    % 2. 绘制数字信号频谱 (基带)
     subplot(1, 2, 2);
     nfft_rx = 2^15;
     [psd_rx_X, f_rx] = pwelch(Rx_Digital_X, [], [], nfft_rx, Params.Fs_Rx, 'centered');
     [psd_rx_Y, ~]    = pwelch(Rx_Digital_Y, [], [], nfft_rx, Params.Fs_Rx, 'centered');
     plot(f_rx / 1e9, 10*log10(psd_rx_X + psd_rx_Y), 'r', 'LineWidth', 1.5);
-    title('OLT接收信号电谱');
-    xlabel('Frequency (GHz)'); ylabel('Power Spectral Density (dB/Hz)');
-    grid on; xlim([-40 40]);
+    title('OLT接收信号电谱'); xlabel('Frequency (GHz)'); ylabel('Power Spectral Density (dB/Hz)'); grid on; xlim([-40 40]);
 
-    saveas(fig_rx_adc, fullfile('img', 'up', 'Rx_ADC_Signal.png'));
+    saveas(fig_rx_adc, fullfile('img', 'up', 'Rx_ADC_Signal_All_ONUs.png'));
     close(fig_rx_adc);
     Plotted_ADC_Uplink = true;
 end
-% ===================================================================================
 
-%% ================== 4. Multi-User Rx DSP ==================
-fprintf('\n=== Running Centralized Rx DSP ===\n');
+%% ================== 4. Multi-User Rx DSP (Loop over all ONUs) ==================
+fprintf('\n=== Running Multi-User Rx DSP ===\n');
 
-% Safety Check
 if isempty(SigX_Full{1})
-    error('CRITICAL ERROR: SigX_Full is empty. The loop failed.');
+    error('CRITICAL ERROR: SigX_Full is empty.');
 end
 
-    % 1. 按照之前的思路，仅提取选定时隙（目标 Burst）的信号
-    rx_start = Params.TDM_StartIdx_Rx(Target_ONU);
-    rx_end   = Params.TDM_EndIdx_Rx(Target_ONU);
-    
-    %% ---- [JLT Co-BM-DSP Modified] ----
-    % 绝对不能截除前导码，将包含 Preamble 的完整突发帧传入 DSP
-    rx_payload_start = rx_start;
-    rx_payload_start = max(1, rx_payload_start);
-    %% ----------------------------------
+% 初始化结果存储
+SNR_List = zeros(1, Params.num_ONUs);
+BER_List = zeros(1, Params.num_ONUs);
+Constellations_List = cell(1, Params.num_ONUs);
 
+for onu_idx = 1:Params.num_ONUs
+    % 严格按照索引切片
+    rx_start = Params.TDM_StartIdx_Rx(onu_idx);
+    rx_end   = Params.TDM_EndIdx_Rx(onu_idx);
+    
+    rx_payload_start = max(1, rx_start);
     rx_end = min(length(Rx_Digital_X), rx_end);
     
     Burst_Rx_X = Rx_Digital_X(rx_payload_start : rx_end);
     Burst_Rx_Y = Rx_Digital_Y(rx_payload_start : rx_end);
     
-    % 2. 设置通道参数为目标时隙对应的参考信号
-    Params.ch = Target_ONU;
+    Params.ch = onu_idx;
     
-    % 3. 调用 DSP 模块处理
+    % 调用 DSP 模块处理
     [SNR, BER, ResData_Burst] = RxDSP_Module_up(Burst_Rx_X, Burst_Rx_Y, SigX_Full, SigY_Full, Params);
     
-    fprintf('  Burst #%d | SNR: %.2f dB | BER: %.2e\n', Target_ONU, SNR, BER);
-
-    ResData.Constellation = ResData_Burst.Constellation(:); 
+    SNR_List(onu_idx) = SNR;
+    BER_List(onu_idx) = BER;
+    Constellations_List{onu_idx} = ResData_Burst.Constellation(:);
+    
+    fprintf('  Burst (ONU) #%d | SNR: %5.2f dB | BER: %.2e\n', onu_idx, SNR, BER);
+end
 end

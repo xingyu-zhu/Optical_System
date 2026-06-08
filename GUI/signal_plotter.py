@@ -43,6 +43,22 @@ def _as_channels(signal) -> np.ndarray:
     return arr
 
 
+def _full_frame_preview_indices(data: np.ndarray, max_samples: int | None) -> np.ndarray:
+    """Select preview samples across the whole frame, preserving burst peaks."""
+    length = data.shape[0]
+    if max_samples is None or length <= max_samples:
+        return np.arange(length, dtype=int)
+
+    edges = np.linspace(0, length, max_samples + 1, dtype=int)
+    energy = np.max(np.abs(data), axis=1)
+    indices: list[int] = []
+    for start, end in zip(edges[:-1], edges[1:]):
+        if end <= start:
+            continue
+        indices.append(start + int(np.argmax(energy[start:end])))
+    return np.asarray(indices, dtype=int)
+
+
 def _frequency_axis(n: int, fs: float | None) -> np.ndarray:
     if fs is None:
         fs = 1.0
@@ -173,6 +189,45 @@ def draw_constellation(
     ax.legend(loc="best", fontsize=8)
 
 
+def draw_time_waveform(
+    ax,
+    signal,
+    fs: float | None = None,
+    max_samples: int | None = 12000,
+    sample_step: float = 1.0,
+    title: str = "Time Domain Waveform",
+) -> None:
+    """Draw real/imaginary time-domain waveform on an existing axes.
+
+    Long burst-mode frames are decimated across the whole frame instead of
+    clipped at the head, so every burst remains visible in the preview.
+    """
+    data = _as_channels(signal)
+    if data.shape[0] == 0:
+        ax.set_title(title)
+        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.set_axis_off()
+        return
+    preview_indices = _full_frame_preview_indices(data, max_samples)
+    data = data[preview_indices, :]
+
+    effective_step = max(float(sample_step or 1.0), 1.0)
+    x = preview_indices * effective_step if fs is None else preview_indices * effective_step / fs * 1e9
+    x_label = "Sample" if fs is None else "Time (ns)"
+
+    for ch in range(data.shape[1]):
+        y = data[:, ch]
+        ax.plot(x, np.real(y), linewidth=1.0, label=f"Ch{ch + 1} real")
+        if np.iscomplexobj(y):
+            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"Ch{ch + 1} imag")
+
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("Amplitude (a.u.)")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="best", fontsize=8)
+
+
 def _finalize(fig, save_path: str | Path | None, show: bool):
     fig.tight_layout()
     if save_path:
@@ -187,18 +242,19 @@ def _finalize(fig, save_path: str | Path | None, show: bool):
 def plot_time_waveform(
     signal,
     fs: float | None = None,
-    max_samples: int | None = 4096,
+    max_samples: int | None = 12000,
+    sample_step: float = 1.0,
     title: str = "Time Domain Waveform",
     save_path: str | Path | None = None,
     show: bool = False,
 ):
     """Plot real/imaginary time-domain waveforms, similar to MATLAB plot()."""
     data = _as_channels(signal)
-    if max_samples is not None:
-        data = data[:max_samples, :]
+    preview_indices = _full_frame_preview_indices(data, max_samples)
+    data = data[preview_indices, :]
 
-    n = data.shape[0]
-    x = np.arange(n) if fs is None else np.arange(n) / fs
+    effective_step = max(float(sample_step or 1.0), 1.0)
+    x = preview_indices * effective_step if fs is None else preview_indices * effective_step / fs
     x_label = "Sample" if fs is None else "Time (s)"
 
     fig, ax = plt.subplots(figsize=(8.5, 3.8))

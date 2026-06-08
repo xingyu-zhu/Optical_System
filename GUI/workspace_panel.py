@@ -31,9 +31,18 @@ from PyQt5.QtWidgets import (
 )
 
 from component_catalog import resolve_icon_path
+from topology_display import build_component_display_names
 
 
 BOOLEAN_VALUES = {"true", "false"}
+DEPRECATED_SCAN_PARAMS = {
+    "PowerStart",
+    "PowerStop",
+    "PowerStep",
+    "OutputPowerStart",
+    "OutputPowerStop",
+    "OutputPowerStep",
+}
 
 
 DEFAULT_COMPONENT_PARAMS: dict[str, dict[str, list[str]]] = {
@@ -311,6 +320,10 @@ class NodeItem(QGraphicsRectItem):
         self.top_port.setPos(self.WIDTH / 2, 0)
         self.bottom_port.setPos(self.WIDTH / 2, self.HEIGHT)
 
+    def set_display_name(self, display_name: str) -> None:
+        self.name_item.setText(display_name)
+        self.name_item.setPos((self.WIDTH - self.name_item.boundingRect().width()) / 2, 74)
+
     def itemChange(self, change, value):  # noqa: N802
         if change == QGraphicsItem.ItemPositionHasChanged:
             for edge in self.edges:
@@ -341,6 +354,7 @@ class TopologyScene(QGraphicsScene):
         self._next_id = 1
         self._drag_port: PortItem | None = None
         self._preview_line: QGraphicsLineItem | None = None
+        self.sweep_config: list[dict] = []
 
     def dragMoveEvent(self, event) -> None:  # noqa: N802
         if event.mimeData().hasFormat("application/x-optical-component"):
@@ -443,6 +457,7 @@ class TopologyScene(QGraphicsScene):
         self._next_id += 1
         node.setPos(pos)
         self.addItem(node)
+        self._refresh_node_display_names()
         self._emit_counts()
         return node
 
@@ -469,6 +484,8 @@ class TopologyScene(QGraphicsScene):
     def _merge_with_default_params(name: str, params: dict | None) -> dict[str, list[str]]:
         merged = TopologyScene._default_params(name)
         for key, value in (params or {}).items():
+            if key in DEPRECATED_SCAN_PARAMS:
+                continue
             merged[key] = list(value) if isinstance(value, list) else [str(value), "", ""]
         return merged
 
@@ -483,6 +500,7 @@ class TopologyScene(QGraphicsScene):
                 for edge in list(item.edges):
                     self._remove_edge(edge)
                 self.removeItem(item)
+        self._refresh_node_display_names()
         self._emit_counts()
 
     def delete_at(self, scene_pos: QPointF) -> None:
@@ -518,10 +536,11 @@ class TopologyScene(QGraphicsScene):
                         "target_side": item.target.side,
                     }
                 )
-        return {"nodes": nodes, "edges": edges}
+        return {"nodes": nodes, "edges": edges, "parameter_sweeps": list(self.sweep_config)}
 
     def deserialize(self, data: dict) -> None:
         self.clear()
+        self.sweep_config = list(data.get("parameter_sweeps", []))
 
         id_to_node: dict[int, NodeItem] = {}
         max_id = 0
@@ -584,6 +603,8 @@ class TopologyScene(QGraphicsScene):
             id_to_node[node_id] = node
             max_id = max(max_id, node_id)
 
+        self._refresh_node_display_names()
+
         for edge_data in edges_data:
             src_node = id_to_node.get(int(edge_data["source_id"]))
             tgt_node = id_to_node.get(int(edge_data["target_id"]))
@@ -598,6 +619,13 @@ class TopologyScene(QGraphicsScene):
 
         self._next_id = max_id + 1
         self._emit_counts()
+
+    def _refresh_node_display_names(self) -> None:
+        nodes = [item for item in self.items() if isinstance(item, NodeItem)]
+        node_data = [{"id": node.node_id, "name": node.meta.name} for node in nodes]
+        labels = build_component_display_names(node_data)
+        for node in nodes:
+            node.set_display_name(labels.get(node.node_id, node.meta.name))
 
     @staticmethod
     def _get_port(node: NodeItem, side: str) -> PortItem:
@@ -720,7 +748,7 @@ class WorkspacePanel(QWidget):
 
     def _edit_node_parameters(self, node: NodeItem) -> None:
         normalized = "".join(ch.lower() for ch in node.meta.name if ch.isalnum())
-        if "oanalyzer" in normalized or "eanalyzer" in normalized:
+        if "oanalyzer" in normalized or "eanalyzer" in normalized or "powermeter" in normalized:
             self.analyzer_open_requested.emit(node.node_id, node.meta.name)
             return
 
@@ -788,3 +816,9 @@ class WorkspacePanel(QWidget):
 
     def clear_topology(self) -> None:
         self.scene.deserialize({"nodes": [], "edges": []})
+
+    def get_sweep_config(self) -> list[dict]:
+        return list(self.scene.sweep_config)
+
+    def set_sweep_config(self, config: list[dict]) -> None:
+        self.scene.sweep_config = list(config or [])

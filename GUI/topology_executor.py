@@ -158,15 +158,31 @@ class TopologyExecutor:
                 outputs_by_node[node_id] = outputs
 
                 # Route outputs to downstream targets by matching edge source/target sides.
+                # Multiple wires may legally land on the same target port (for example
+                # several ONU branches entering one Combiner). Preserve all of them by
+                # suffixing repeated target ports instead of overwriting earlier inputs.
                 for e in outgoing_edges.get(node_id, []):
                     if e.source_side not in outputs:
                         # Allow generic fallback when component returns one primary output.
                         if "default" in outputs:
-                            routed_inputs[e.target_id][e.target_side] = outputs["default"]
+                            target_port = self._available_input_port(routed_inputs[e.target_id], e.target_side)
+                            routed_inputs[e.target_id][target_port] = outputs["default"]
                         continue
-                    routed_inputs[e.target_id][e.target_side] = outputs[e.source_side]
+                    target_port = self._available_input_port(routed_inputs[e.target_id], e.target_side)
+                    routed_inputs[e.target_id][target_port] = outputs[e.source_side]
 
         return outputs_by_node
+
+    @staticmethod
+    def _available_input_port(port_map: dict[str, Any], requested_port: str) -> str:
+        base = requested_port or "input"
+        if base not in port_map:
+            return base
+
+        index = 2
+        while f"{base}_{index}" in port_map:
+            index += 1
+        return f"{base}_{index}"
 
 
 def demo_runner(node: Node, inputs_by_port: dict[str, Any]) -> dict[str, Any]:

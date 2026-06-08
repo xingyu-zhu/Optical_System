@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
-from PyQt5.QtWidgets import QAction, QFileDialog, QLabel, QMainWindow, QSplitter, QToolBar, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QAction, QFileDialog, QLabel, QMainWindow, QMessageBox, QSplitter, QToolBar, QVBoxLayout, QWidget
 
 from component_panel import ComponentPanel
 from matlab_engine_manager import MatlabEngineManager
 from matlab_topology_runner import MatlabTopologyRunner
 from output_widget import OutputWidget
+from parameter_sweep_dialog import ParameterSweepDialog
 from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
+from signal_plotter import _as_array
+from topology_display import build_component_display_names, result_component_allowed
 from workspace_panel import WorkspacePanel
 from topology_executor import TopologyCycleError, TopologyExecutor
 
@@ -51,7 +54,7 @@ class MainWindow(QMainWindow):
         self._latest_topology = None
         self._latest_outputs = {}
         self._analysis_windows = []
-        self.setWindowTitle("多维复用超高速光网络仿真平台")
+        self.setWindowTitle("多维复用超高速光接入端到端系统仿真平台")
         self.resize(1280, 820)
 
         self._setup_central(engine_manager)
@@ -66,7 +69,7 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(6, 6, 6, 6)
         root_layout.setSpacing(6)
 
-        title_label = QLabel("多维复用超高速光网络仿真平台")
+        title_label = QLabel("多维复用超高速光接入端到端系统仿真平台")
         title_label.setObjectName("windowTitleLabel")
         title_label.setAlignment(Qt.AlignCenter)
         root_layout.addWidget(title_label)
@@ -112,6 +115,7 @@ class MainWindow(QMainWindow):
 
         sim_menu = menu.addMenu("仿真")
         sim_menu.addAction(self._make_action("拓扑仿真", "F5", self._run_topology_simulation))
+        sim_menu.addAction(self._make_action("参数扫描", None, self._configure_parameter_sweep))
         sim_menu.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
         sim_menu.addAction(self._make_action("停止仿真", "Shift+F5", self._stub_action))
 
@@ -135,6 +139,7 @@ class MainWindow(QMainWindow):
 
         sim_tb = QToolBar("仿真", self)
         sim_tb.addAction(self._make_action("运行", None, self._run_topology_simulation))
+        sim_tb.addAction(self._make_action("参数扫描", None, self._configure_parameter_sweep))
         sim_tb.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
         self.addToolBar(sim_tb)
 
@@ -228,6 +233,24 @@ class MainWindow(QMainWindow):
         worker.failed.connect(self._on_topology_simulation_failed)
         worker.start()
 
+    def _configure_parameter_sweep(self) -> None:
+        topology = self.workspace_panel.scene.serialize()
+        nodes = topology.get("nodes", [])
+        if not nodes:
+            self.output_widget.append_message("请先在工作区添加组件，再配置参数扫描。", source="INFO")
+            return
+
+        dialog = ParameterSweepDialog(nodes, topology.get("parameter_sweeps", []), self)
+        if dialog.exec_():
+            sweeps = dialog.get_sweeps()
+            self.workspace_panel.set_sweep_config(sweeps)
+            enabled_count = sum(1 for item in sweeps if item.get("enabled", True))
+            self.status_label.setText(f"参数扫描: {enabled_count} 项已启用")
+            self.output_widget.append_message(
+                f"Parameter sweep configured: {enabled_count} enabled item(s).",
+                source="INFO",
+            )
+
     def _on_topology_simulation_finished(self, outputs: dict) -> None:
         self._latest_outputs = outputs or {}
         self.status_label.setText("拓扑仿真完成")
@@ -239,57 +262,137 @@ class MainWindow(QMainWindow):
 
     def _show_analyzer_for_node(self, node_id: int, name: str) -> None:
         normalized = "".join(ch.lower() for ch in name if ch.isalnum())
+        display_name = self._display_name_for_node(node_id, name)
         workspace = self._node_workspace(node_id)
         if not workspace:
             self.output_widget.append_message(
-                f"{name} 暂无可显示结果，请先运行拓扑仿真并确保该分析仪已连接信号。",
+                f"{display_name} 暂无可显示结果，请先运行拓扑仿真并确保该组件已连接信号。",
                 source="INFO",
             )
+            return
+        if "powermeter" in normalized:
+            self._show_power_meter_result(display_name, workspace)
             return
         if workspace.get("Status") != "called" or workspace.get("AnalyzerSignal") is None:
             waiting_for = workspace.get("WaitingFor")
             error = workspace.get("Error")
             detail = f"等待: {waiting_for}" if waiting_for else (f"错误: {error}" if error else "无有效分析仪信号")
             self.output_widget.append_message(
-                f"{name} 暂无可显示结果，{detail}。",
+                f"{display_name} 暂无可显示结果，{detail}。",
                 source="INFO",
             )
             return
 
         if "oanalyzer" in normalized:
-            dialog = AnalyzerPlotDialog.optical(name, workspace, self)
+            dialog = AnalyzerPlotDialog.optical(display_name, workspace, self)
         elif "eanalyzer" in normalized:
-            dialog = AnalyzerPlotDialog.electrical(name, workspace, self)
+            dialog = AnalyzerPlotDialog.electrical(display_name, workspace, self)
         else:
             return
 
         self._analysis_windows.append(dialog)
         dialog.show()
 
+    def _show_power_meter_result(self, display_name: str, workspace: dict) -> None:
+        if workspace.get("Status") != "called" or "Power_dBm" not in workspace:
+            waiting_for = workspace.get("WaitingFor")
+            error = workspace.get("Error")
+            detail = f"等待: {waiting_for}" if waiting_for else (f"错误: {error}" if error else "无有效光功率")
+            self.output_widget.append_message(f"{display_name} 暂无可显示功率，{detail}。", source="INFO")
+            return
+
+        power_dbm = self._scalar_display(workspace.get("Power_dBm"), "dBm")
+        power_w = self._scalar_display(workspace.get("Power_Watts"), "W")
+        QMessageBox.information(
+            self,
+            f"光功率 - {display_name}",
+            f"{display_name}\n\n光功率: {power_dbm}\n光功率: {power_w}",
+        )
+
+    @staticmethod
+    def _scalar_display(value, unit: str) -> str:
+        arr = _as_array(value)
+        if arr.size == 0:
+            return "-"
+        try:
+            return f"{float(arr.reshape(-1)[0]):.6g} {unit}"
+        except Exception:
+            return f"{value} {unit}"
+
     def _show_simulation_results(self) -> None:
         rows = []
         topology = self._latest_topology or self.workspace_panel.scene.serialize()
-        node_names = {int(n.get("id")): str(n.get("name", "")) for n in topology.get("nodes", [])}
+        nodes = topology.get("nodes", [])
+        node_names = {int(n.get("id")): str(n.get("name", "")) for n in nodes}
+        display_names = build_component_display_names(nodes)
 
         for node_id, outputs in (self._latest_outputs or {}).items():
+            if not isinstance(node_id, int):
+                continue
+            component_name = node_names.get(int(node_id), "")
+            if not result_component_allowed(component_name):
+                continue
             workspace = self._workspace_from_outputs(outputs)
             if workspace and ("SNR" in workspace or "BER" in workspace):
-                rows.append(
-                    {
-                        "node_id": node_id,
-                        "name": node_names.get(int(node_id), ""),
-                        "SNR": workspace.get("SNR"),
-                        "BER": workspace.get("BER"),
-                    }
+                rows.extend(
+                    self._metric_rows_for_workspace(
+                        node_id,
+                        display_names.get(int(node_id), component_name),
+                        workspace,
+                    )
                 )
 
-        dialog = SimulationResultDialog(rows, self)
+        sweep = (self._latest_outputs or {}).get("__sweep__")
+        dialog = SimulationResultDialog(rows, sweep, self)
         self._analysis_windows.append(dialog)
         dialog.show()
 
     def _node_workspace(self, node_id: int) -> dict:
         outputs = (self._latest_outputs or {}).get(node_id)
         return self._workspace_from_outputs(outputs)
+
+    @staticmethod
+    def _metric_rows_for_workspace(node_id: int, display_name: str, workspace: dict) -> list[dict]:
+        snr = _as_array(workspace.get("SNR"))
+        ber = _as_array(workspace.get("BER"))
+        count = max(int(snr.size), int(ber.size), 1)
+        rows = []
+        for idx in range(count):
+            suffix = f" - ONU {idx + 1}" if count > 1 else ""
+            rows.append(
+                {
+                    "node_id": node_id,
+                    "name": f"{display_name}{suffix}",
+                    "SNR": MainWindow._metric_value(snr, idx),
+                    "BER": MainWindow._metric_value(ber, idx),
+                    "constellation": MainWindow._constellation_for_index(workspace, idx),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _metric_value(values, index: int):
+        if values.size == 0:
+            return None
+        flat = values.reshape(-1)
+        return flat[min(index, flat.size - 1)]
+
+    @staticmethod
+    def _constellation_for_index(workspace: dict, index: int):
+        previews = workspace.get("ConstellationPreviews")
+        if previews is not None:
+            try:
+                if isinstance(previews, (list, tuple)) and previews:
+                    return previews[min(index, len(previews) - 1)]
+                if hasattr(previews, "__len__") and len(previews) > 0:
+                    return previews[min(index, len(previews) - 1)]
+            except Exception:
+                pass
+        return workspace.get("ConstellationPreview") if index == 0 else None
+
+    def _display_name_for_node(self, node_id: int, fallback: str) -> str:
+        topology = self._latest_topology or self.workspace_panel.scene.serialize()
+        return build_component_display_names(topology.get("nodes", [])).get(int(node_id), fallback)
 
     @staticmethod
     def _workspace_from_outputs(outputs) -> dict:

@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import copy
+import itertools
+import math
 from typing import Any, Callable
+
+import numpy as np
 
 from matlab_component_registry import component_type_for_component, matlab_function_for_component
 from matlab_engine_manager import MatlabEngineManager
+from topology_display import build_component_display_names, result_component_allowed
 from topology_executor import Node, TopologyExecutor
 
 
@@ -20,6 +26,12 @@ class MatlabTopologyRunner:
         self.log = log or (lambda _message, _source="INFO": None)
 
     def run(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
+        sweep = self._build_parameter_sweep(topology)
+        if sweep:
+            return self._run_parameter_sweep(topology, sweep)
+        return self._run_once(topology)
+
+    def _run_once(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
         executor = TopologyExecutor(topology)
         levels = executor.topological_levels()
         node_contexts = self._build_node_contexts(executor)
@@ -75,6 +87,299 @@ class MatlabTopologyRunner:
         finally:
             self._clear_matlab_workspace_cache(eng)
 
+    def _run_parameter_sweep(self, topology: dict[str, Any], sweep: dict[str, Any]) -> dict[int, dict[str, Any]]:
+        points = list(self._iter_sweep_points(sweep["depth_groups"]))
+        rows: list[dict[str, Any]] = []
+        last_outputs: dict[int, dict[str, Any]] = {}
+
+        total = len(points)
+        self.log(f"Parameter sweep enabled: {total} point(s).", "INFO")
+
+        for index, point in enumerate(points, start=1):
+            point_topology = self._topology_with_sweep_values(topology, point["assignments"])
+            self.log(f"Parameter sweep point {index}/{total}: {point['label']}", "INFO")
+            outputs = self._run_once(point_topology)
+            last_outputs = outputs
+            rows.extend(self._collect_sweep_rows(outputs, point_topology, point, index))
+
+        result = dict(last_outputs)
+        result["__sweep__"] = {
+            "axes": sweep["axes"],
+            "rows": rows,
+            "power_budget": self._compute_power_budget(rows),
+        }
+        return result
+
+    def _build_parameter_sweep(self, topology: dict[str, Any]) -> dict[str, Any] | None:
+        axes: list[dict[str, Any]] = []
+        node_by_id = {int(node["id"]): node for node in topology.get("nodes", []) if "id" in node}
+        for item in topology.get("parameter_sweeps", []):
+            if not item.get("enabled", True):
+                continue
+            node_id = self._int_or_none(item.get("node_id"))
+            parameter = str(item.get("parameter", "")).strip()
+            if node_id is None or not parameter:
+                continue
+            node = node_by_id.get(node_id)
+            if not node:
+                continue
+            values = self._range_from_values(item.get("start"), item.get("stop"), item.get("step"))
+            if not values:
+                continue
+            component = str(item.get("component") or node.get("name", ""))
+            unit = str(item.get("unit", ""))
+            axes.append(
+                {
+                    "kind": self._sweep_kind(component, parameter),
+                    "label": f"{component}.{parameter}",
+                    "node_id": node_id,
+                    "component": component,
+                    "param": parameter,
+                    "values": values,
+                    "unit": unit,
+                    "depth": max(1, int(self._float_or_none(item.get("depth")) or 1)),
+                }
+            )
+
+        if not axes:
+            return None
+
+        depth_groups: list[dict[str, Any]] = []
+        for depth in sorted({int(axis["depth"]) for axis in axes}):
+            group_axes = [axis for axis in axes if int(axis["depth"]) == depth]
+            depth_groups.append({"depth": depth, "axes": group_axes})
+        return {"axes": axes, "depth_groups": depth_groups}
+
+    def _iter_sweep_points(self, depth_groups: list[dict[str, Any]]):
+        grouped_points = [self._simultaneous_group_points(group["axes"]) for group in depth_groups]
+        for combo in itertools.product(*grouped_points):
+            assignments: list[dict[str, Any]] = []
+            values_by_kind: dict[str, float] = {}
+            value_labels: list[str] = []
+            for group_point in combo:
+                assignments.extend(group_point["assignments"])
+                values_by_kind.update(group_point["values_by_kind"])
+                value_labels.extend(group_point["labels"])
+            yield {
+                "assignments": assignments,
+                "values_by_kind": values_by_kind,
+                "label": ", ".join(value_labels),
+            }
+
+    def _simultaneous_group_points(self, axes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not axes:
+            return [{"assignments": [], "values_by_kind": {}, "labels": []}]
+        length = max(len(axis["values"]) for axis in axes)
+        points: list[dict[str, Any]] = []
+        for index in range(length):
+            assignments = []
+            values_by_kind: dict[str, float] = {}
+            labels = []
+            for axis in axes:
+                values = axis["values"]
+                value = values[min(index, len(values) - 1)]
+                assignment = dict(axis)
+                assignment["value"] = value
+                assignments.append(assignment)
+                if axis["kind"] not in {"parameter"}:
+                    values_by_kind[axis["kind"]] = value
+                labels.append(f"{axis['label']}={self._format_number(value)}{axis.get('unit', '')}")
+            points.append({"assignments": assignments, "values_by_kind": values_by_kind, "labels": labels})
+        return points
+
+    def _topology_with_sweep_values(
+        self,
+        topology: dict[str, Any],
+        assignments: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        data = copy.deepcopy(topology)
+        nodes = {int(node["id"]): node for node in data.get("nodes", [])}
+        for assignment in assignments:
+            value = assignment["value"]
+            node = nodes.get(int(assignment["node_id"]))
+            if not node:
+                continue
+            params = node.setdefault("params", {})
+            old = params.get(assignment["param"], ["", assignment.get("unit", ""), ""])
+            unit = old[1] if isinstance(old, list) and len(old) > 1 else assignment.get("unit", "")
+            desc = old[2] if isinstance(old, list) and len(old) > 2 else assignment.get("label", "")
+            params[assignment["param"]] = [self._format_number(value), unit, desc]
+        return data
+
+    def _collect_sweep_rows(
+        self,
+        outputs: dict[int, dict[str, Any]],
+        topology: dict[str, Any],
+        point: dict[str, Any],
+        point_index: int,
+    ) -> list[dict[str, Any]]:
+        nodes = topology.get("nodes", [])
+        names = {int(n["id"]): str(n.get("name", "")) for n in nodes}
+        display_names = build_component_display_names(nodes)
+        values_by_kind = point.get("values_by_kind", {})
+        sweep_values = {
+            assignment["label"]: assignment["value"]
+            for assignment in point.get("assignments", [])
+        }
+        rows: list[dict[str, Any]] = []
+        for node_id, node_outputs in outputs.items():
+            if not isinstance(node_id, int):
+                continue
+            component_name = names.get(node_id, "")
+            if not result_component_allowed(component_name):
+                continue
+            workspace = self._workspace_from_outputs(node_outputs)
+            if not workspace or ("SNR" not in workspace and "BER" not in workspace):
+                continue
+            display_name = display_names.get(node_id, component_name)
+            snr_values = self._as_flat_array(workspace.get("SNR"))
+            ber_values = self._as_flat_array(workspace.get("BER"))
+            metric_count = max(len(snr_values), len(ber_values), 1)
+            for metric_index in range(metric_count):
+                suffix = f" - ONU {metric_index + 1}" if metric_count > 1 else ""
+                rows.append(
+                    {
+                        "point_index": point_index,
+                        "node_id": node_id,
+                        "component": f"{display_name}{suffix}",
+                        "sweep_label": point.get("label", ""),
+                        "sweep_values": sweep_values,
+                        "tx_power_dbm": values_by_kind.get("tx_power_dbm"),
+                        "rop_dbm": values_by_kind.get("rop_dbm"),
+                        "SNR": self._metric_value(snr_values, metric_index),
+                        "BER": self._metric_value(ber_values, metric_index),
+                    }
+                )
+        return rows
+
+    def _compute_power_budget(self, rows: list[dict[str, Any]], fec_limit: float = 1e-2) -> list[dict[str, Any]]:
+        by_key: dict[tuple[float | None, int, str], list[dict[str, Any]]] = {}
+        for row in rows:
+            if row.get("tx_power_dbm") is None or row.get("rop_dbm") is None:
+                continue
+            key = (row.get("tx_power_dbm"), int(row.get("node_id", 0)), str(row.get("component", "")))
+            by_key.setdefault(key, []).append(row)
+
+        budget_rows: list[dict[str, Any]] = []
+        for (tx_power, node_id, component), group in sorted(by_key.items(), key=lambda item: (item[0][0], item[0][1])):
+            sensitivity = self._interpolate_sensitivity(group, fec_limit)
+            budget = None if sensitivity is None else float(tx_power) - sensitivity
+            budget_rows.append(
+                {
+                    "tx_power_dbm": tx_power,
+                    "node_id": node_id,
+                    "component": component,
+                    "sensitivity_dbm": sensitivity,
+                    "power_budget_db": budget,
+                    "fec_limit": fec_limit,
+                }
+            )
+        return budget_rows
+
+    def _interpolate_sensitivity(self, rows: list[dict[str, Any]], fec_limit: float) -> float | None:
+        points = []
+        for row in rows:
+            rop = self._float_or_none(row.get("rop_dbm"))
+            ber = self._float_or_none(row.get("BER"))
+            if rop is not None and ber is not None and ber > 0:
+                points.append((rop, ber))
+        points.sort()
+        if not points:
+            return None
+
+        target = math.log10(fec_limit)
+        for (rop_a, ber_a), (rop_b, ber_b) in zip(points, points[1:]):
+            log_a = math.log10(ber_a)
+            log_b = math.log10(ber_b)
+            if (log_a - target) * (log_b - target) <= 0 and log_a != log_b:
+                ratio = (target - log_a) / (log_b - log_a)
+                return rop_a + ratio * (rop_b - rop_a)
+        return None
+
+    @staticmethod
+    def _range_from_values(start_value: Any, stop_value: Any, step_value: Any) -> list[float] | None:
+        start = MatlabTopologyRunner._float_or_none(start_value)
+        stop = MatlabTopologyRunner._float_or_none(stop_value)
+        step = MatlabTopologyRunner._float_or_none(step_value)
+        return MatlabTopologyRunner._range_from_numbers(start, stop, step)
+
+    @staticmethod
+    def _range_from_numbers(start: float | None, stop: float | None, step: float | None) -> list[float] | None:
+        if start is None or stop is None:
+            return None
+        if step is None or step == 0:
+            step = 1.0 if stop >= start else -1.0
+        if (stop - start) * step < 0:
+            step = -step
+
+        values: list[float] = []
+        current = start
+        limit = 1000
+        while len(values) < limit and ((step > 0 and current <= stop + 1e-12) or (step < 0 and current >= stop - 1e-12)):
+            values.append(round(current, 12))
+            current += step
+        return values or None
+
+    @staticmethod
+    def _sweep_kind(component: str, parameter: str) -> str:
+        component_type = component_type_for_component(component)
+        param = parameter.strip().lower()
+        if component_type in {"lasercw", "laser"} and param == "power":
+            return "tx_power_dbm"
+        if component_type == "voa" and param == "outputpower":
+            return "rop_dbm"
+        return "parameter"
+
+    @staticmethod
+    def _int_or_none(value: Any) -> int | None:
+        try:
+            if value is None:
+                return None
+            return int(float(value))
+        except Exception:
+            return None
+
+    @staticmethod
+    def _as_flat_array(value: Any) -> list[Any]:
+        try:
+            arr = np.asarray(value)
+            if arr.dtype == object:
+                arr = np.array(arr.tolist())
+            arr = np.squeeze(arr).reshape(-1)
+            return list(arr)
+        except Exception:
+            return [] if value is None else [value]
+
+    @staticmethod
+    def _metric_value(values: list[Any], index: int) -> Any:
+        if not values:
+            return None
+        return values[min(index, len(values) - 1)]
+
+    @staticmethod
+    def _workspace_from_outputs(outputs: Any) -> dict[str, Any]:
+        if not isinstance(outputs, dict):
+            return {}
+        workspace = outputs.get("default") or outputs.get("right") or outputs.get("bottom") or outputs.get("info")
+        return workspace if isinstance(workspace, dict) else {}
+
+    @staticmethod
+    def _float_or_none(value: Any) -> float | None:
+        try:
+            if value is None:
+                return None
+            if isinstance(value, (list, tuple)) and value:
+                value = value[0]
+            return float(value)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _format_number(value: float) -> str:
+        if abs(value - round(value)) < 1e-12:
+            return str(int(round(value)))
+        return f"{value:.12g}"
+
     def _close_hidden_matlab_figures(self, eng) -> None:
         """Prevent MATLAB plotting code from accumulating invisible figures."""
         try:
@@ -101,6 +406,31 @@ class MatlabTopologyRunner:
         if workspace.get("MemoryNote"):
             parts.append(str(workspace["MemoryNote"]))
         self.log("; ".join(parts), "MATLAB")
+        self._log_workspace_metrics(node, workspace)
+
+    def _log_workspace_metrics(self, node: Node, workspace: dict[str, Any]) -> None:
+        if "SNR" not in workspace and "BER" not in workspace:
+            return
+        snr_values = self._as_flat_array(workspace.get("SNR"))
+        ber_values = self._as_flat_array(workspace.get("BER"))
+        metric_count = max(len(snr_values), len(ber_values), 1)
+        for idx in range(metric_count):
+            suffix = f" ONU {idx + 1}" if metric_count > 1 else ""
+            snr = self._metric_value(snr_values, idx)
+            ber = self._metric_value(ber_values, idx)
+            self.log(
+                f"  Result {node.name}{suffix}: SNR={self._format_metric(snr)} dB, BER={self._format_metric(ber)}",
+                "MATLAB",
+            )
+
+    @staticmethod
+    def _format_metric(value: Any) -> str:
+        if value is None:
+            return "-"
+        try:
+            return f"{float(np.real(value)):.6g}"
+        except Exception:
+            return str(value)
 
     def _build_node_contexts(self, executor: TopologyExecutor) -> dict[int, dict[str, Any]]:
         """Assign per-type indices and topology metadata to every node."""

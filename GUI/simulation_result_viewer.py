@@ -15,7 +15,15 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QDialog, QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout
 
-from signal_plotter import draw_constellation, draw_optical_spectrum, draw_spectrum, float_or_default, scalar_text
+from signal_plotter import (
+    _as_array,
+    draw_constellation,
+    draw_optical_spectrum,
+    draw_spectrum,
+    draw_time_waveform,
+    float_or_default,
+    scalar_text,
+)
 
 
 class AnalyzerPlotDialog(QDialog):
@@ -35,7 +43,13 @@ class AnalyzerPlotDialog(QDialog):
         signal = workspace.get("AnalyzerSignal")
         fs = float_or_default(workspace.get("AnalyzerFs"), 92e9)
         center = float_or_default(workspace.get("AnalyzerCenterFrequency"), 193.1e12)
-        dialog._add_optical_spectrum(signal, fs, center)
+        dialog._add_optical_spectrum(
+            signal,
+            fs,
+            center,
+            workspace.get("AnalyzerOpticalFrequencyTHz"),
+            workspace.get("AnalyzerOpticalPowerdBm"),
+        )
         return dialog
 
     @classmethod
@@ -43,9 +57,14 @@ class AnalyzerPlotDialog(QDialog):
         label = workspace.get("AnalyzerSignalLabel", "Electrical Signal")
         dialog = cls(f"电分析仪 - {node_name}", parent)
         signal = workspace.get("AnalyzerSignal")
+        constellation = workspace.get("AnalyzerConstellation", signal)
         fs = float_or_default(workspace.get("AnalyzerFs"), 92e9)
-        dialog._add_constellation(signal, str(label))
-        dialog._add_electrical_spectrum(signal, fs, str(label))
+        sample_step = float_or_default(workspace.get("AnalyzerSignalSampleStep"), 1.0)
+        spectrum_freq = workspace.get("AnalyzerSpectrumFrequencyGHz")
+        spectrum_psd = workspace.get("AnalyzerSpectrumPSDdBHz")
+        dialog._add_time_waveform(signal, fs, str(label), sample_step)
+        dialog._add_constellation(constellation, str(label))
+        dialog._add_electrical_spectrum(signal, fs, str(label), spectrum_freq, spectrum_psd)
         return dialog
 
     def _add_canvas(self, title: str) -> tuple[Figure, Any]:
@@ -54,16 +73,61 @@ class AnalyzerPlotDialog(QDialog):
         self.tabs.addTab(canvas, title)
         return fig, canvas
 
-    def _add_optical_spectrum(self, signal: Any, fs: float, center_frequency: float) -> None:
+    def _add_optical_spectrum(
+        self,
+        signal: Any,
+        fs: float,
+        center_frequency: float,
+        optical_freq_thz: Any = None,
+        optical_power_dbm: Any = None,
+    ) -> None:
         fig, canvas = self._add_canvas("光谱")
         ax = fig.add_subplot(111)
-        draw_optical_spectrum(ax, signal, fs, center_frequency_hz=center_frequency)
+        freq = _as_array(optical_freq_thz)
+        power = _as_array(optical_power_dbm)
+        if freq.size and power.size and freq.size == power.size:
+            x = freq.reshape(-1)
+            y = power.reshape(-1)
+            ax.plot(x, y, color="#003366", linewidth=2.0)
+            ax.set_title("Optical Spectrum")
+            ax.set_xlabel("Frequency (THz)")
+            ax.set_ylabel("Power (dBm)")
+            center_thz = center_frequency / 1e12 if center_frequency else None
+            if center_thz:
+                ax.set_xlim(center_thz - 0.05, center_thz + 0.05)
+            ax.set_ylim(-90, 10)
+            ax.grid(True, alpha=0.25)
+        else:
+            draw_optical_spectrum(ax, signal, fs, center_frequency_hz=center_frequency)
         canvas.draw()
 
-    def _add_electrical_spectrum(self, signal: Any, fs: float, label: str) -> None:
+    def _add_electrical_spectrum(
+        self,
+        signal: Any,
+        fs: float,
+        label: str,
+        spectrum_freq_ghz: Any = None,
+        spectrum_psd_db_hz: Any = None,
+    ) -> None:
         fig, canvas = self._add_canvas("频谱")
         ax = fig.add_subplot(111)
-        draw_spectrum(ax, signal, fs, title=f"{label} Spectrum")
+        freq = _as_array(spectrum_freq_ghz)
+        psd = _as_array(spectrum_psd_db_hz)
+        if freq.size and psd.size and freq.size == psd.size:
+            ax.plot(freq.reshape(-1), psd.reshape(-1), color="#c74440", linewidth=1.5)
+            ax.set_title(f"{label} Spectrum")
+            ax.set_xlabel("Frequency (GHz)")
+            ax.set_ylabel("Power Spectral Density (dB/Hz)")
+            ax.set_xlim(-40, 40)
+            ax.grid(True, alpha=0.25)
+        else:
+            draw_spectrum(ax, signal, fs, title=f"{label} Spectrum")
+        canvas.draw()
+
+    def _add_time_waveform(self, signal: Any, fs: float, label: str, sample_step: float = 1.0) -> None:
+        fig, canvas = self._add_canvas("时域波形")
+        ax = fig.add_subplot(111)
+        draw_time_waveform(ax, signal, fs=fs, sample_step=sample_step, title=f"{label} Time Waveform")
         canvas.draw()
 
     def _add_constellation(self, signal: Any, label: str) -> None:
@@ -76,12 +140,23 @@ class AnalyzerPlotDialog(QDialog):
 class SimulationResultDialog(QDialog):
     """Table dialog for BER and SNR extracted from receiver DSP outputs."""
 
-    def __init__(self, rows: list[dict[str, Any]], parent=None):
+    def __init__(self, rows: list[dict[str, Any]], sweep: dict[str, Any] | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("仿真结果")
-        self.resize(620, 360)
+        self.resize(860, 560)
 
         layout = QVBoxLayout(self)
+        self.tabs = QTabWidget(self)
+        layout.addWidget(self.tabs)
+
+        self._add_summary_tab(rows)
+        if any(item.get("constellation") is not None for item in rows):
+            self._add_result_constellation_tab(rows)
+        if sweep and sweep.get("rows"):
+            self._add_sweep_tab(sweep.get("rows", []))
+            self._add_budget_tab(sweep.get("power_budget", []), sweep.get("rows", []))
+
+    def _add_summary_tab(self, rows: list[dict[str, Any]]) -> None:
         table = QTableWidget(self)
         table.setColumnCount(4)
         table.setHorizontalHeaderLabels(["节点ID", "组件", "SNR", "BER"])
@@ -100,4 +175,127 @@ class SimulationResultDialog(QDialog):
             table.setItem(0, 2, QTableWidgetItem("-"))
             table.setItem(0, 3, QTableWidgetItem("-"))
 
-        layout.addWidget(table)
+        self.tabs.addTab(table, "BER/SNR")
+
+    def _add_result_constellation_tab(self, rows: list[dict[str, Any]]) -> None:
+        tab = QTabWidget(self)
+        added = False
+        for item in rows:
+            constellation = item.get("constellation")
+            if constellation is None:
+                continue
+            fig = Figure(figsize=(5.0, 4.6), tight_layout=True)
+            canvas = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
+            label = str(item.get("name", "Constellation"))
+            draw_constellation(ax, constellation, title=f"{label} Constellation")
+            canvas.draw()
+            tab.addTab(canvas, label)
+            added = True
+        if added:
+            self.tabs.addTab(tab, "星座图")
+
+    def _add_sweep_tab(self, rows: list[dict[str, Any]]) -> None:
+        table = QTableWidget(self)
+        headers = ["扫描点", "节点ID", "组件", "扫描参数", "发射功率(dBm)", "接收光功率(dBm)", "SNR", "BER"]
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setRowCount(len(rows))
+
+        for row_idx, item in enumerate(rows):
+            values = [
+                item.get("point_index", ""),
+                item.get("node_id", ""),
+                item.get("component", ""),
+                item.get("sweep_label", self._sweep_values_text(item.get("sweep_values"))),
+                scalar_text(item.get("tx_power_dbm")),
+                scalar_text(item.get("rop_dbm")),
+                scalar_text(item.get("SNR")),
+                scalar_text(item.get("BER")),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(row_idx, col, QTableWidgetItem(str(value)))
+
+        self.tabs.addTab(table, "参数扫描")
+
+    def _add_budget_tab(self, budget_rows: list[dict[str, Any]], sweep_rows: list[dict[str, Any]]) -> None:
+        tab = QTabWidget(self)
+
+        budget_table = QTableWidget(self)
+        headers = ["发射功率(dBm)", "节点ID", "组件", "灵敏度(dBm)", "功率预算(dB)", "FEC门限"]
+        budget_table.setColumnCount(len(headers))
+        budget_table.setHorizontalHeaderLabels(headers)
+        budget_table.horizontalHeader().setStretchLastSection(True)
+        budget_table.setRowCount(max(1, len(budget_rows)))
+        if budget_rows:
+            for row_idx, item in enumerate(budget_rows):
+                values = [
+                    scalar_text(item.get("tx_power_dbm")),
+                    item.get("node_id", ""),
+                    item.get("component", ""),
+                    scalar_text(item.get("sensitivity_dbm")),
+                    scalar_text(item.get("power_budget_db")),
+                    scalar_text(item.get("fec_limit")),
+                ]
+                for col, value in enumerate(values):
+                    budget_table.setItem(row_idx, col, QTableWidgetItem(str(value)))
+        else:
+            budget_table.setItem(0, 0, QTableWidgetItem("需要同时配置发射功率扫描和接收光功率扫描。"))
+        tab.addTab(budget_table, "数据")
+
+        fig = Figure(figsize=(7.8, 4.6), tight_layout=True)
+        canvas = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        if budget_rows:
+            x = [float(item["tx_power_dbm"]) for item in budget_rows if item.get("power_budget_db") is not None]
+            y = [float(item["power_budget_db"]) for item in budget_rows if item.get("power_budget_db") is not None]
+            if x and y:
+                ax.plot(x, y, "-o", color="#2f7d4f", linewidth=2.0)
+                ax.set_title("功率预算 vs 发射功率")
+                ax.set_xlabel("发射光功率 (dBm)")
+                ax.set_ylabel("功率预算 (dB)")
+            else:
+                ax.text(0.5, 0.5, "BER 扫描点不足，无法插值功率预算", ha="center", va="center", transform=ax.transAxes)
+        else:
+            ax.text(0.5, 0.5, "暂无功率预算数据", ha="center", va="center", transform=ax.transAxes)
+        ax.grid(True, alpha=0.25)
+        canvas.draw()
+        tab.addTab(canvas, "功率预算图")
+
+        fig2 = Figure(figsize=(7.8, 4.6), tight_layout=True)
+        canvas2 = FigureCanvas(fig2)
+        ax2 = fig2.add_subplot(111)
+        plotted = False
+        grouped: dict[Any, list[dict[str, Any]]] = {}
+        for row in sweep_rows:
+            if row.get("rop_dbm") is None or row.get("BER") is None:
+                continue
+            grouped.setdefault(row.get("tx_power_dbm"), []).append(row)
+        for tx_power, group in sorted(grouped.items(), key=lambda item: (item[0] is None, item[0])):
+            group = sorted(group, key=lambda item: float(item["rop_dbm"]))
+            x = [float(item["rop_dbm"]) for item in group]
+            y = [max(float(item["BER"]), 1e-12) for item in group]
+            if x and y:
+                label = f"Tx={scalar_text(tx_power)} dBm" if tx_power is not None else "BER"
+                ax2.semilogy(x, y, "-o", linewidth=1.8, label=label)
+                plotted = True
+        if plotted:
+            ax2.axhline(1e-2, color="0.25", linestyle="--", linewidth=1.0, label="FEC=1e-2")
+            ax2.set_title("BER vs 接收光功率")
+            ax2.set_xlabel("接收光功率 (dBm)")
+            ax2.set_ylabel("BER")
+            ax2.legend(loc="best", fontsize=8)
+        else:
+            ax2.text(0.5, 0.5, "暂无 BER/ROP 扫描曲线", ha="center", va="center", transform=ax2.transAxes)
+        ax2.grid(True, alpha=0.25)
+        canvas2.draw()
+        tab.addTab(canvas2, "BER曲线")
+
+        self.tabs.addTab(tab, "功率预算")
+
+    @staticmethod
+    def _sweep_values_text(values: Any) -> str:
+        if not isinstance(values, dict):
+            return ""
+        return ", ".join(f"{key}={scalar_text(value)}" for key, value in values.items())

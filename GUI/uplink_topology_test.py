@@ -53,7 +53,17 @@ def build_uplink_topology(num_onu: int, target_onu: int) -> dict[str, Any]:
 
         nodes.extend(
             [
-                node(txdsp, "ONUTxDSP"),
+                node(
+                    txdsp,
+                    "ONUTxDSP",
+                    {
+                        "TransmitFrequency": ["193.1", "THz", "发射频率"],
+                        "BaudRate": ["25", "GBaud", "单 ONU 波特率"],
+                        "Modulation": ["QPSK", "", "调制格式"],
+                        "SymbolNumber": ["32768", "", "符号数"],
+                        "NumBands": ["1", "", "上行固定单子载波"],
+                    },
+                ),
                 node(dac, "DAC"),
                 node(driver, "Driver"),
                 node(
@@ -80,16 +90,28 @@ def build_uplink_topology(num_onu: int, target_onu: int) -> dict[str, Any]:
     combiner = next_id
     fiber = next_id + 1
     oa = next_id + 2
-    icr = next_id + 3
-    tia = next_id + 4
-    adc = next_id + 5
-    rxdsp = next_id + 6
+    lo = next_id + 3
+    icr = next_id + 4
+    tia = next_id + 5
+    adc = next_id + 6
+    rxdsp = next_id + 7
 
     nodes.extend(
         [
             node(combiner, "Combiner"),
             node(fiber, "Fiber", {"Length": ["20", "km", "光纤长度"]}),
             node(oa, "OA", {"OutputPower": ["0", "dBm", "输出功率"]}),
+            node(
+                lo,
+                "LO",
+                {
+                    "Power": ["13", "dBm", "本振光功率"],
+                    "Linewidth": ["100", "kHz", "本振线宽"],
+                    "FreqOffset": ["0.5", "GHz", "本振频偏"],
+                    "Phase": ["0", "deg", "初始相位"],
+                    "RIN": ["-150", "dB/Hz", "相对强度噪声"],
+                },
+            ),
             node(icr, "ICR"),
             node(tia, "TIA"),
             node(adc, "ADC"),
@@ -112,6 +134,7 @@ def build_uplink_topology(num_onu: int, target_onu: int) -> dict[str, Any]:
             edge(combiner, fiber, "left"),
             edge(fiber, oa, "left"),
             edge(oa, icr, "left"),
+            edge(lo, icr, "top"),
             edge(icr, tia, "left"),
             edge(tia, adc, "left"),
             edge(adc, rxdsp, "left"),

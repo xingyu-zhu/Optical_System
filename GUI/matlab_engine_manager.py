@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 import threading
 from typing import Any, Optional
@@ -30,12 +31,14 @@ class MatlabEngineManager:
         """Check whether engine has been started."""
         return self._engine is not None
 
-    def start(self, connect_existing: bool = True, shared_name: Optional[str] = None):
+    def start(self, connect_existing: bool = False, shared_name: Optional[str] = None):
         """Start MATLAB Engine or connect to an existing shared session."""
         with self._lock:
             if self._engine is not None:
                 self._configure_project_paths()
                 return self._engine
+
+            self._configure_engine_python_path()
 
             try:
                 import matlab.engine
@@ -62,6 +65,20 @@ class MatlabEngineManager:
             self._engine = matlab.engine.start_matlab()
             self._configure_project_paths()
             return self._engine
+
+    def _configure_engine_python_path(self) -> None:
+        """Add the bundled MATLAB engine package path when MATLAB is installed locally."""
+        candidates = [
+            Path("/Applications/MATLAB_R2026a.app/extern/engines/python/dist"),
+            Path("/Applications/MATLAB_R2025b.app/extern/engines/python/dist"),
+            Path("/Applications/MATLAB_R2025a.app/extern/engines/python/dist"),
+        ]
+        for path in candidates:
+            if path.exists():
+                text = str(path)
+                if text not in sys.path:
+                    sys.path.insert(0, text)
+                return
 
     def _configure_project_paths(self) -> None:
         """Add the local PON component library and keep MATLAB plots headless."""

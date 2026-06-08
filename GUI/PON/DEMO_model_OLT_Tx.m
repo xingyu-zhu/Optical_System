@@ -34,8 +34,9 @@ Params.deltafs = 0.5e9; %%FO
 % Calculate Carrier Frequencies
 scbw = Params.scbw;
 grdbw = Params.grdbw;
-Params.cf = [-3*scbw-grdbw, -1*scbw-grdbw, 1*scbw+grdbw, 3*scbw+grdbw];
+% Params.cf = [-3*scbw-grdbw, -1*scbw-grdbw, 1*scbw+grdbw, 3*scbw+grdbw];
 
+Params.cf = [-3*scbw-grdbw, -1*scbw-grdbw, 1*scbw+grdbw, 3*scbw+grdbw]
 % Pilot Parameters
 Params.SPPR = 30; % dB
 

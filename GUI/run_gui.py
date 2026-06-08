@@ -44,7 +44,7 @@ class StartupWindow(QWidget):
         self.setFixedSize(720, 250)
         self.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
 
-        self.title_label = QLabel("多维复用超高速光网络仿真平台", self)
+        self.title_label = QLabel("多维复用超高速光接入端到端系统仿真平台", self)
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet("font-size: 26px; font-weight: 700; color: #1f2f40;")
 
@@ -86,7 +86,7 @@ def _move_window_to_startup_screen(startup: QWidget, window: QWidget) -> None:
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("多维复用超高速光网络仿真平台")
+    app.setApplicationName("多维复用超高速光接入端到端系统仿真平台")
     app.setOrganizationName("香港理工大学光子研究院")
     apply_app_style(app)
 
