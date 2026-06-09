@@ -5,13 +5,16 @@ from __future__ import annotations
 import copy
 import itertools
 import math
+import gc
+import re
+import subprocess
 from typing import Any, Callable
 
 import numpy as np
 
 from matlab_component_registry import component_type_for_component, matlab_function_for_component
 from matlab_engine_manager import MatlabEngineManager
-from topology_display import build_component_display_names, result_component_allowed
+from topology_display import build_component_display_names, build_node_display_indices, result_component_allowed
 from topology_executor import Node, TopologyExecutor
 
 
@@ -35,28 +38,18 @@ class MatlabTopologyRunner:
         executor = TopologyExecutor(topology)
         levels = executor.topological_levels()
         node_contexts = self._build_node_contexts(executor)
-
-        self.log("MATLAB topology execution plan:", "INFO")
-        for idx, level in enumerate(levels, start=1):
-            names = [executor.nodes[nid].name for nid in level]
-            self.log(f"L{idx}: {list(zip(level, names))}", "INFO")
+        _, _, incoming_edges, outgoing_edges = executor._build_graph()
+        remaining_cache_consumers = {
+            node_id: len(outgoing_edges.get(node_id, []))
+            for node_id in executor.nodes
+        }
 
         eng = self.engine_manager.start()
         self._clear_matlab_workspace_cache(eng)
 
         def component_runner(node: Node, inputs_by_port: dict[str, Any]) -> dict[str, Any]:
-            ports = sorted(k for k in inputs_by_port.keys() if not k.startswith("__"))
             function_name = matlab_function_for_component(node.name)
             node_context = node_contexts[node.node_id]
-            self.log(
-                (
-                    f"MATLAB map node {node.node_id} ({node.name}) "
-                    f"[{node_context['component_type']} #{node_context['type_index']}/"
-                    f"{node_context['type_count']}] -> {function_name or '<unmapped>'}, inputs={ports}"
-                ),
-                "MATLAB",
-            )
-            self._log_params(node)
 
             matlab_inputs = self._to_matlab_inputs(inputs_by_port)
             matlab_params = self._to_matlab_params(node.params or {})
@@ -73,6 +66,17 @@ class MatlabTopologyRunner:
             self._close_hidden_matlab_figures(eng)
             result = dict(outputs)
             self._log_workspace_status(node, result)
+            for edge in incoming_edges.get(node.node_id, []):
+                remaining_cache_consumers[edge.source_id] = max(
+                    0,
+                    remaining_cache_consumers.get(edge.source_id, 0) - 1,
+                )
+                if remaining_cache_consumers[edge.source_id] == 0:
+                    source_node = executor.nodes.get(edge.source_id)
+                    if source_node is not None:
+                        self._delete_matlab_workspace_cache_ref(eng, source_node.node_id, source_node.name)
+            if remaining_cache_consumers.get(node.node_id, 0) == 0:
+                self._delete_matlab_workspace_cache_ref(eng, node.node_id, node.name)
             return {
                 "default": result,
                 "right": result,
@@ -82,10 +86,10 @@ class MatlabTopologyRunner:
 
         try:
             outputs = executor.run(component_runner)
-            self.log(f"MATLAB topology run finished. Nodes executed: {len(outputs)}", "MATLAB")
+            self._log_final_metrics(outputs, topology)
             return outputs
         finally:
-            self._clear_matlab_workspace_cache(eng)
+            self._cleanup_matlab_after_run(eng)
 
     def _run_parameter_sweep(self, topology: dict[str, Any], sweep: dict[str, Any]) -> dict[int, dict[str, Any]]:
         points = list(self._iter_sweep_points(sweep["depth_groups"]))
@@ -93,11 +97,10 @@ class MatlabTopologyRunner:
         last_outputs: dict[int, dict[str, Any]] = {}
 
         total = len(points)
-        self.log(f"Parameter sweep enabled: {total} point(s).", "INFO")
 
         for index, point in enumerate(points, start=1):
             point_topology = self._topology_with_sweep_values(topology, point["assignments"])
-            self.log(f"Parameter sweep point {index}/{total}: {point['label']}", "INFO")
+            self.log(f"参数扫描 {index}/{total}", "INFO")
             outputs = self._run_once(point_topology)
             last_outputs = outputs
             rows.extend(self._collect_sweep_rows(outputs, point_topology, point, index))
@@ -216,6 +219,7 @@ class MatlabTopologyRunner:
         nodes = topology.get("nodes", [])
         names = {int(n["id"]): str(n.get("name", "")) for n in nodes}
         display_names = build_component_display_names(nodes)
+        display_indices = build_node_display_indices(nodes)
         values_by_kind = point.get("values_by_kind", {})
         sweep_values = {
             assignment["label"]: assignment["value"]
@@ -241,6 +245,7 @@ class MatlabTopologyRunner:
                     {
                         "point_index": point_index,
                         "node_id": node_id,
+                        "display_node_id": display_indices.get(node_id, node_id),
                         "component": f"{display_name}{suffix}",
                         "sweep_label": point.get("label", ""),
                         "sweep_values": sweep_values,
@@ -268,6 +273,7 @@ class MatlabTopologyRunner:
                 {
                     "tx_power_dbm": tx_power,
                     "node_id": node_id,
+                    "display_node_id": group[0].get("display_node_id", node_id),
                     "component": component,
                     "sensitivity_dbm": sensitivity,
                     "power_budget_db": budget,
@@ -394,34 +400,94 @@ class MatlabTopologyRunner:
         except Exception:
             pass
 
+    def _delete_matlab_workspace_cache_ref(self, eng, node_id: int, component_name: str) -> None:
+        try:
+            ref = self._workspace_ref_for_node(node_id, component_name)
+            eng.feval("OC_GUI_RunWorkspaceComponent", "__delete_cache__", ref, {}, {}, {}, nargout=0)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _workspace_ref_for_node(node_id: int, component_name: str) -> str:
+        component = re.sub(r"[^a-zA-Z0-9]", "", str(component_name)).lower() or "node"
+        return f"node_{int(node_id)}_{component}"
+
+    def _cleanup_matlab_after_run(self, eng) -> None:
+        """Release MATLAB-side temporary data while keeping Python summaries."""
+        before_memory_mb = self._matlab_memory_mb(eng)
+        self._clear_matlab_workspace_cache(eng)
+        self._close_hidden_matlab_figures(eng)
+        for command in (
+            "clearvars;",
+            "if usejava('jvm'), java.lang.System.gc(); end",
+            "drawnow;",
+        ):
+            try:
+                eng.eval(command, nargout=0)
+            except Exception:
+                pass
+        gc.collect()
+        after_memory_mb = self._matlab_memory_mb(eng)
+        if before_memory_mb is not None and after_memory_mb is not None:
+            delta = after_memory_mb - before_memory_mb
+            if delta > 512:
+                self.log(f"MATLAB 内存清理后仍增长 {delta:.1f} MB", "INFO")
+
+    def _matlab_memory_mb(self, eng) -> float | None:
+        try:
+            pid = int(float(eng.eval("feature('getpid')", nargout=1)))
+            result = subprocess.run(
+                ["ps", "-o", "rss=", "-p", str(pid)],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return None
+            rss_kb = float(result.stdout.strip().splitlines()[0].strip())
+            return rss_kb / 1024.0
+        except Exception:
+            return None
+
     def _log_workspace_status(self, node: Node, workspace: dict[str, Any]) -> None:
         status = workspace.get("Status")
         if not status:
             return
-        parts = [f"  Node {node.node_id} status: {status}"]
+        parts = [f"{node.name}: {status}"]
         if workspace.get("WaitingFor"):
             parts.append(f"waiting_for={workspace['WaitingFor']}")
         if workspace.get("Error"):
             parts.append(f"error={workspace['Error']}")
-        if workspace.get("MemoryNote"):
-            parts.append(str(workspace["MemoryNote"]))
         self.log("; ".join(parts), "MATLAB")
-        self._log_workspace_metrics(node, workspace)
 
-    def _log_workspace_metrics(self, node: Node, workspace: dict[str, Any]) -> None:
-        if "SNR" not in workspace and "BER" not in workspace:
-            return
-        snr_values = self._as_flat_array(workspace.get("SNR"))
-        ber_values = self._as_flat_array(workspace.get("BER"))
-        metric_count = max(len(snr_values), len(ber_values), 1)
-        for idx in range(metric_count):
-            suffix = f" ONU {idx + 1}" if metric_count > 1 else ""
-            snr = self._metric_value(snr_values, idx)
-            ber = self._metric_value(ber_values, idx)
-            self.log(
-                f"  Result {node.name}{suffix}: SNR={self._format_metric(snr)} dB, BER={self._format_metric(ber)}",
-                "MATLAB",
-            )
+    def _log_final_metrics(self, outputs: dict[int, dict[str, Any]], topology: dict[str, Any]) -> None:
+        nodes = topology.get("nodes", [])
+        names = {int(n["id"]): str(n.get("name", "")) for n in nodes}
+        display_names = build_component_display_names(nodes)
+        rows: list[str] = []
+        for node_id, node_outputs in outputs.items():
+            if not isinstance(node_id, int):
+                continue
+            component_name = names.get(node_id, "")
+            if not result_component_allowed(component_name):
+                continue
+            workspace = self._workspace_from_outputs(node_outputs)
+            if not workspace or ("SNR" not in workspace and "BER" not in workspace):
+                continue
+            snr_values = self._as_flat_array(workspace.get("SNR"))
+            ber_values = self._as_flat_array(workspace.get("BER"))
+            metric_count = max(len(snr_values), len(ber_values), 1)
+            display_name = display_names.get(node_id, component_name)
+            for idx in range(metric_count):
+                suffix = f" ONU {idx + 1}" if metric_count > 1 else ""
+                snr = self._metric_value(snr_values, idx)
+                ber = self._metric_value(ber_values, idx)
+                rows.append(f"{display_name}{suffix}: SNR={self._format_metric(snr)} dB, BER={self._format_metric(ber)}")
+        if rows:
+            self.log("最终 BER/SNR:", "MATLAB")
+            for row in rows:
+                self.log(f"  {row}", "MATLAB")
 
     @staticmethod
     def _format_metric(value: Any) -> str:

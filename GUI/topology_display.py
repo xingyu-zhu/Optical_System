@@ -24,6 +24,12 @@ def build_component_display_names(nodes: list[dict[str, Any]]) -> dict[int, str]
     return labels
 
 
+def build_node_display_indices(nodes: list[dict[str, Any]]) -> dict[int, int]:
+    """Return compact display indices like 1, 2, 3 for current design nodes."""
+    sorted_nodes = sorted(nodes, key=lambda item: int(item.get("id", 0)))
+    return {int(node.get("id", 0)): index for index, node in enumerate(sorted_nodes, start=1)}
+
+
 def result_component_allowed(component_name: str) -> bool:
     """Filter components whose BER/SNR would duplicate receiver DSP results."""
     return component_type_for_component(component_name) not in RESULT_EXCLUDED_TYPES

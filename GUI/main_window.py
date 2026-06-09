@@ -17,7 +17,7 @@ from output_widget import OutputWidget
 from parameter_sweep_dialog import ParameterSweepDialog
 from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
 from signal_plotter import _as_array
-from topology_display import build_component_display_names, result_component_allowed
+from topology_display import build_component_display_names, build_node_display_indices, result_component_allowed
 from workspace_panel import WorkspacePanel
 from topology_executor import TopologyCycleError, TopologyExecutor
 
@@ -462,6 +462,7 @@ class MainWindow(QMainWindow):
         nodes = topology.get("nodes", [])
         node_names = {int(n.get("id")): str(n.get("name", "")) for n in nodes}
         display_names = build_component_display_names(nodes)
+        display_indices = build_node_display_indices(nodes)
 
         for node_id, outputs in (self._latest_outputs or {}).items():
             if not isinstance(node_id, int):
@@ -474,6 +475,7 @@ class MainWindow(QMainWindow):
                 rows.extend(
                     self._metric_rows_for_workspace(
                         node_id,
+                        display_indices.get(int(node_id), int(node_id)),
                         display_names.get(int(node_id), component_name),
                         workspace,
                     )
@@ -489,7 +491,12 @@ class MainWindow(QMainWindow):
         return self._workspace_from_outputs(outputs)
 
     @staticmethod
-    def _metric_rows_for_workspace(node_id: int, display_name: str, workspace: dict) -> list[dict]:
+    def _metric_rows_for_workspace(
+        node_id: int,
+        display_node_id: int,
+        display_name: str,
+        workspace: dict,
+    ) -> list[dict]:
         snr = _as_array(workspace.get("SNR"))
         ber = _as_array(workspace.get("BER"))
         count = max(int(snr.size), int(ber.size), 1)
@@ -499,6 +506,7 @@ class MainWindow(QMainWindow):
             rows.append(
                 {
                     "node_id": node_id,
+                    "display_node_id": display_node_id,
                     "name": f"{display_name}{suffix}",
                     "SNR": MainWindow._metric_value(snr, idx),
                     "BER": MainWindow._metric_value(ber, idx),

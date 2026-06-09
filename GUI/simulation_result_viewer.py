@@ -159,13 +159,13 @@ class SimulationResultDialog(QDialog):
     def _add_summary_tab(self, rows: list[dict[str, Any]]) -> None:
         table = QTableWidget(self)
         table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(["节点ID", "组件", "SNR", "BER"])
+        table.setHorizontalHeaderLabels(["节点编号", "组件", "SNR", "BER"])
         table.horizontalHeader().setStretchLastSection(True)
         table.setRowCount(max(1, len(rows)))
 
         if rows:
             for row, item in enumerate(rows):
-                table.setItem(row, 0, QTableWidgetItem(str(item.get("node_id", ""))))
+                table.setItem(row, 0, QTableWidgetItem(str(item.get("display_node_id", item.get("node_id", "")))))
                 table.setItem(row, 1, QTableWidgetItem(str(item.get("name", ""))))
                 table.setItem(row, 2, QTableWidgetItem(scalar_text(item.get("SNR"))))
                 table.setItem(row, 3, QTableWidgetItem(scalar_text(item.get("BER"))))
@@ -197,7 +197,7 @@ class SimulationResultDialog(QDialog):
 
     def _add_sweep_tab(self, rows: list[dict[str, Any]]) -> None:
         table = QTableWidget(self)
-        headers = ["扫描点", "节点ID", "组件", "扫描参数", "发射功率(dBm)", "接收光功率(dBm)", "SNR", "BER"]
+        headers = ["扫描点", "节点编号", "组件", "扫描参数", "发射功率(dBm)", "接收光功率(dBm)", "SNR", "BER"]
         table.setColumnCount(len(headers))
         table.setHorizontalHeaderLabels(headers)
         table.horizontalHeader().setStretchLastSection(True)
@@ -206,7 +206,7 @@ class SimulationResultDialog(QDialog):
         for row_idx, item in enumerate(rows):
             values = [
                 item.get("point_index", ""),
-                item.get("node_id", ""),
+                item.get("display_node_id", item.get("node_id", "")),
                 item.get("component", ""),
                 item.get("sweep_label", self._sweep_values_text(item.get("sweep_values"))),
                 scalar_text(item.get("tx_power_dbm")),
@@ -223,7 +223,7 @@ class SimulationResultDialog(QDialog):
         tab = QTabWidget(self)
 
         budget_table = QTableWidget(self)
-        headers = ["发射功率(dBm)", "节点ID", "组件", "灵敏度(dBm)", "功率预算(dB)", "FEC门限"]
+        headers = ["发射功率(dBm)", "节点编号", "组件", "灵敏度(dBm)", "功率预算(dB)", "FEC门限"]
         budget_table.setColumnCount(len(headers))
         budget_table.setHorizontalHeaderLabels(headers)
         budget_table.horizontalHeader().setStretchLastSection(True)
@@ -232,7 +232,7 @@ class SimulationResultDialog(QDialog):
             for row_idx, item in enumerate(budget_rows):
                 values = [
                     scalar_text(item.get("tx_power_dbm")),
-                    item.get("node_id", ""),
+                    item.get("display_node_id", item.get("node_id", "")),
                     item.get("component", ""),
                     scalar_text(item.get("sensitivity_dbm")),
                     scalar_text(item.get("power_budget_db")),

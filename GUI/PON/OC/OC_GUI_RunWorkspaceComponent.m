@@ -11,6 +11,11 @@ function ws = OC_GUI_RunWorkspaceComponent(componentName, matlabFunctionName, in
         ws = struct();
         return;
     end
+    if nargin >= 2 && strcmp(char(componentName), '__delete_cache__')
+        ocWorkspaceCache('delete', matlabFunctionName);
+        ws = struct();
+        return;
+    end
 
     if nargin < 3 || isempty(inputs), inputs = struct(); end
     if nargin < 4 || isempty(guiParams), guiParams = struct(); end
@@ -1573,6 +1578,12 @@ function out = ocWorkspaceCache(action, key, value)
             else
                 out = [];
             end
+        case 'delete'
+            field = matlab.lang.makeValidName(char(key));
+            if isfield(cache, field)
+                cache = rmfield(cache, field);
+            end
+            out = [];
         otherwise
             out = [];
     end

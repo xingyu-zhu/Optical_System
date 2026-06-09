@@ -505,6 +505,7 @@ class TopologyScene(QGraphicsScene):
                 for edge in list(item.edges):
                     self._remove_edge(edge)
                 self.removeItem(item)
+        self._renumber_nodes_contiguously()
         self._refresh_node_display_names()
         self._sync_next_id()
         self._emit_counts()
@@ -549,8 +550,6 @@ class TopologyScene(QGraphicsScene):
         self.sweep_config = list(data.get("parameter_sweeps", []))
 
         id_to_node: dict[int, NodeItem] = {}
-        max_id = 0
-
         nodes_data = data.get("nodes", [])
         edges_data = data.get("edges", [])
         has_xy = all(("x" in n and "y" in n) for n in nodes_data)
@@ -607,7 +606,6 @@ class TopologyScene(QGraphicsScene):
             node.setPos(QPointF(x, y))
             self.addItem(node)
             id_to_node[node_id] = node
-            max_id = max(max_id, node_id)
 
         self._refresh_node_display_names()
 
@@ -623,7 +621,8 @@ class TopologyScene(QGraphicsScene):
             src_node.edges.append(edge)
             tgt_node.edges.append(edge)
 
-        self._next_id = max_id + 1
+        self._renumber_nodes_contiguously()
+        self._sync_next_id()
         self._emit_counts()
 
     def _refresh_node_display_names(self) -> None:
@@ -652,6 +651,29 @@ class TopologyScene(QGraphicsScene):
     def _sync_next_id(self) -> None:
         node_ids = [item.node_id for item in self.items() if isinstance(item, NodeItem)]
         self._next_id = max(node_ids, default=0) + 1
+
+    def _renumber_nodes_contiguously(self) -> None:
+        nodes = sorted(
+            [item for item in self.items() if isinstance(item, NodeItem)],
+            key=lambda node: node.node_id,
+        )
+        id_map: dict[int, int] = {}
+        for new_id, node in enumerate(nodes, start=1):
+            old_id = node.node_id
+            if old_id != new_id:
+                node.node_id = new_id
+            id_map[old_id] = new_id
+        if id_map:
+            updated_sweeps: list[dict] = []
+            for sweep in self.sweep_config:
+                try:
+                    old_id = int(sweep.get("node_id", 0))
+                except Exception:
+                    continue
+                if old_id in id_map:
+                    sweep["node_id"] = id_map[old_id]
+                    updated_sweeps.append(sweep)
+            self.sweep_config = updated_sweeps
 
     def _emit_design_changed(self) -> None:
         self.design_changed.emit()
