@@ -27,6 +27,7 @@ function [E_out, Debug_Data] = OC_VOA_Module(E_in, Params)
     end
 
     Att_dB = VOA_Config.Attenuation;
+    Mode = 'Attenuation';
     
     % Check 'Active' status (Default to 'On' if missing)
     if isfield(VOA_Config, 'Active')
@@ -37,6 +38,7 @@ function [E_out, Debug_Data] = OC_VOA_Module(E_in, Params)
 
     %% 2. Apply Attenuation
     if isfield(VOA_Config, 'OutputPower') && ~isempty(VOA_Config.OutputPower)
+        Mode = 'OutputPower';
         P_in_W = opticalPower(E_in);
         target_W = VOA_Config.OutputPower;
         if P_in_W > 0 && target_W > 0
@@ -62,6 +64,7 @@ function [E_out, Debug_Data] = OC_VOA_Module(E_in, Params)
     P_in_W = opticalPower(E_in);
     P_out_W = opticalPower(E_out);
 
+    Debug_Data.Mode = Mode;
     Debug_Data.Attenuation_Setting_dB = Att_dB;
     if isfield(VOA_Config, 'OutputPower') && ~isempty(VOA_Config.OutputPower)
         Debug_Data.TargetOutputPower_dBm = 10*log10(VOA_Config.OutputPower * 1000);

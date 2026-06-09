@@ -47,6 +47,7 @@ class ComponentPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._list_widgets: list[QListWidget] = []
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -56,6 +57,8 @@ class ComponentPanel(QWidget):
 
         title = QLabel("组件库")
         title.setObjectName("panelTitle")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 12pt; font-weight: 700;")
         layout.addWidget(title)
 
         row = QHBoxLayout()
@@ -63,9 +66,10 @@ class ComponentPanel(QWidget):
 
         for group_name, components in COMPONENT_GROUPS.items():
             group_widget, list_widget = self._create_group(group_name, components)
+            self._list_widgets.append(list_widget)
             row.addWidget(group_widget, 1)
             list_widget.itemClicked.connect(
-                lambda item, _lw=list_widget: self.component_selected.emit(item.data(Qt.UserRole))
+                lambda item, _lw=list_widget: self._on_component_clicked(item, _lw)
             )
 
         layout.addLayout(row, 1)
@@ -101,3 +105,11 @@ class ComponentPanel(QWidget):
         c_layout.addWidget(label)
         c_layout.addWidget(list_widget, 1)
         return container, list_widget
+
+    def _on_component_clicked(self, item: QListWidgetItem, source_list: QListWidget) -> None:
+        for list_widget in self._list_widgets:
+            if list_widget is source_list:
+                continue
+            list_widget.clearSelection()
+            list_widget.setCurrentItem(None)
+        self.component_selected.emit(item.data(Qt.UserRole))

@@ -858,12 +858,29 @@ function Params = applyGuiComponentParams(Params, guiParams)
     Params.Opt.Obj.Tx.MZM.Bandwidth = ghzParam(guiParams, {'Bandwidth'}, 35e9);
 
     Params.Opt.Obj.EmissionFrequency = thzParam(guiParams, {'TransmitFrequency', 'EmissionFrequency'}, 193.1e12);
-    Params.Opt.Obj.Amp.OutputPower = dbmParam(guiParams, {'OutputPower'}, 1e-3);
+    ampMode = lower(char(getParamAny(guiParams, {'Mode', 'ControlMode'}, 'OutputPower')));
+    if contains(ampMode, 'gain') || contains(ampMode, '增益')
+        Params.Opt.Obj.Amp.Type = 'GainControlled';
+        Params.Opt.Obj.Amp.Mode = 'Gain';
+        Params.Opt.Obj.Amp.Gain = getParam(guiParams, 'Gain', 0);
+        Params.Opt.Obj.Amp.OutputPower = [];
+    else
+        Params.Opt.Obj.Amp.Type = 'PowerControlled';
+        Params.Opt.Obj.Amp.Mode = 'OutputPower';
+        Params.Opt.Obj.Amp.OutputPower = dbmParam(guiParams, {'OutputPower'}, 1e-3);
+    end
     Params.Opt.Obj.Amp.NoiseFigure = getParamAny(guiParams, {'NF', 'NoiseFigure'}, 5);
     Params.Opt.Obj.Amp.GainMax = getParam(guiParams, 'GainMax', safeGet(Params.Opt.Obj.Amp, {'GainMax'}, 100));
-    Params.Opt.Obj.Amp.Type = 'PowerControlled';
-    Params.Opt.Obj.VOA.OutputPower = dbmParam(guiParams, {'OutputPower'}, []);
-    Params.Opt.Obj.VOA.Attenuation = getParam(guiParams, 'Attenuation', 0);
+    voaMode = lower(char(getParamAny(guiParams, {'Mode', 'ControlMode'}, 'OutputPower')));
+    if contains(voaMode, 'atten') || contains(voaMode, '衰减')
+        Params.Opt.Obj.VOA.Mode = 'Attenuation';
+        Params.Opt.Obj.VOA.OutputPower = [];
+        Params.Opt.Obj.VOA.Attenuation = getParam(guiParams, 'Attenuation', 0);
+    else
+        Params.Opt.Obj.VOA.Mode = 'OutputPower';
+        Params.Opt.Obj.VOA.OutputPower = dbmParam(guiParams, {'OutputPower'}, []);
+        Params.Opt.Obj.VOA.Attenuation = 0;
+    end
     Params.Opt.Obj.VOA.Active = 'On';
 
     Params.Opt.Obj.Rx.PD.BandWidth = ghzParam(guiParams, {'Bandwidth'}, safeGet(Params.Opt.Obj.Rx.PD, {'BandWidth'}, 25e9));

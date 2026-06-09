@@ -8,6 +8,8 @@ import math
 import gc
 import re
 import subprocess
+import time
+import threading
 from typing import Any, Callable
 
 import numpy as np
@@ -21,14 +23,25 @@ from topology_executor import Node, TopologyExecutor
 LogCallback = Callable[[str, str], None]
 
 
+class SimulationCancelled(RuntimeError):
+    """Raised when the user requests a running simulation to stop."""
+
+
 class MatlabTopologyRunner:
     """Run the current GUI topology by dispatching each node to MATLAB."""
 
-    def __init__(self, engine_manager: MatlabEngineManager, log: LogCallback | None = None):
+    def __init__(
+        self,
+        engine_manager: MatlabEngineManager,
+        log: LogCallback | None = None,
+        cancel_event: threading.Event | None = None,
+    ):
         self.engine_manager = engine_manager
         self.log = log or (lambda _message, _source="INFO": None)
+        self.cancel_event = cancel_event
 
     def run(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
+        self._raise_if_cancelled()
         sweep = self._build_parameter_sweep(topology)
         if sweep:
             return self._run_parameter_sweep(topology, sweep)
@@ -48,13 +61,15 @@ class MatlabTopologyRunner:
         self._clear_matlab_workspace_cache(eng)
 
         def component_runner(node: Node, inputs_by_port: dict[str, Any]) -> dict[str, Any]:
+            self._raise_if_cancelled()
             function_name = matlab_function_for_component(node.name)
             node_context = node_contexts[node.node_id]
 
             matlab_inputs = self._to_matlab_inputs(inputs_by_port)
             matlab_params = self._to_matlab_params(node.params or {})
             node_context["return_lightweight"] = True
-            outputs = eng.feval(
+            outputs = self._feval_interruptible(
+                eng,
                 "OC_GUI_RunWorkspaceComponent",
                 node.name,
                 function_name,
@@ -63,6 +78,7 @@ class MatlabTopologyRunner:
                 node_context,
                 nargout=1,
             )
+            self._raise_if_cancelled()
             self._close_hidden_matlab_figures(eng)
             result = dict(outputs)
             self._log_workspace_status(node, result)
@@ -99,6 +115,7 @@ class MatlabTopologyRunner:
         total = len(points)
 
         for index, point in enumerate(points, start=1):
+            self._raise_if_cancelled()
             point_topology = self._topology_with_sweep_values(topology, point["assignments"])
             self.log(f"参数扫描 {index}/{total}", "INFO")
             outputs = self._run_once(point_topology)
@@ -113,8 +130,39 @@ class MatlabTopologyRunner:
         }
         return result
 
+    def _raise_if_cancelled(self) -> None:
+        if self.cancel_event is not None and self.cancel_event.is_set():
+            raise SimulationCancelled("用户已停止仿真。")
+
+    def _feval_interruptible(self, eng, func_name: str, *args: Any, nargout: int = 1) -> Any:
+        if self.cancel_event is None:
+            return eng.feval(func_name, *args, nargout=nargout)
+
+        self._raise_if_cancelled()
+        try:
+            future = eng.feval(func_name, *args, nargout=nargout, background=True)
+        except TypeError:
+            # Older MATLAB Engine builds may not support background=True for feval.
+            return eng.feval(func_name, *args, nargout=nargout)
+
+        while not self._future_done(future):
+            if self.cancel_event.is_set():
+                try:
+                    future.cancel()
+                except Exception:
+                    pass
+                raise SimulationCancelled("用户已停止仿真。")
+            time.sleep(0.08)
+        return future.result()
+
+    @staticmethod
+    def _future_done(future) -> bool:
+        done = getattr(future, "done", False)
+        return bool(done() if callable(done) else done)
+
     def _build_parameter_sweep(self, topology: dict[str, Any]) -> dict[str, Any] | None:
         axes: list[dict[str, Any]] = []
+        errors: list[str] = []
         node_by_id = {int(node["id"]): node for node in topology.get("nodes", []) if "id" in node}
         for item in topology.get("parameter_sweeps", []):
             if not item.get("enabled", True):
@@ -122,12 +170,18 @@ class MatlabTopologyRunner:
             node_id = self._int_or_none(item.get("node_id"))
             parameter = str(item.get("parameter", "")).strip()
             if node_id is None or not parameter:
+                errors.append("启用的参数扫描缺少组件或参数。")
                 continue
             node = node_by_id.get(node_id)
             if not node:
+                errors.append(f"启用的参数扫描指向不存在的节点 {node_id}。")
                 continue
             values = self._range_from_values(item.get("start"), item.get("stop"), item.get("step"))
             if not values:
+                component_name = str(item.get("component") or node.get("name", f"Node {node_id}"))
+                errors.append(
+                    f"{component_name}.{parameter} 的扫描范围无效，请检查起始、终止和步长。"
+                )
                 continue
             component = str(item.get("component") or node.get("name", ""))
             unit = str(item.get("unit", ""))
@@ -144,6 +198,8 @@ class MatlabTopologyRunner:
                 }
             )
 
+        if errors:
+            raise ValueError("参数扫描设置无效: " + " ".join(errors))
         if not axes:
             return None
 
@@ -221,6 +277,7 @@ class MatlabTopologyRunner:
         display_names = build_component_display_names(nodes)
         display_indices = build_node_display_indices(nodes)
         values_by_kind = point.get("values_by_kind", {})
+        baseline_values = self._baseline_power_values(topology)
         sweep_values = {
             assignment["label"]: assignment["value"]
             for assignment in point.get("assignments", [])
@@ -249,13 +306,150 @@ class MatlabTopologyRunner:
                         "component": f"{display_name}{suffix}",
                         "sweep_label": point.get("label", ""),
                         "sweep_values": sweep_values,
-                        "tx_power_dbm": values_by_kind.get("tx_power_dbm"),
-                        "rop_dbm": values_by_kind.get("rop_dbm"),
+                        "tx_power_dbm": values_by_kind.get("tx_power_dbm", baseline_values.get("tx_power_dbm")),
+                        "rop_dbm": values_by_kind.get("rop_dbm", baseline_values.get("rop_dbm")),
                         "SNR": self._metric_value(snr_values, metric_index),
                         "BER": self._metric_value(ber_values, metric_index),
                     }
                 )
         return rows
+
+    def _baseline_power_values(self, topology: dict[str, Any]) -> dict[str, float]:
+        values: dict[str, float] = {}
+        nodes = {int(node["id"]): node for node in topology.get("nodes", []) if "id" in node}
+        incoming_edges = self._incoming_edges_by_target(topology)
+
+        tx_power = self._launch_power_before_fiber(nodes, incoming_edges)
+        if tx_power is None:
+            tx_power = self._first_power_for_type(nodes, incoming_edges, {"oa", "edfa", "lasercw", "laser"})
+        if tx_power is not None:
+            values["tx_power_dbm"] = tx_power
+
+        rop_power = self._first_power_for_type(nodes, incoming_edges, {"voa"})
+        if rop_power is not None:
+            values["rop_dbm"] = rop_power
+        return values
+
+    @staticmethod
+    def _incoming_edges_by_target(topology: dict[str, Any]) -> dict[int, list[dict[str, Any]]]:
+        incoming: dict[int, list[dict[str, Any]]] = {}
+        for edge in topology.get("edges", []):
+            try:
+                target_id = int(edge["target_id"])
+                int(edge["source_id"])
+            except Exception:
+                continue
+            incoming.setdefault(target_id, []).append(edge)
+        for edges in incoming.values():
+            edges.sort(key=lambda item: int(item.get("source_id", 0)))
+        return incoming
+
+    def _launch_power_before_fiber(
+        self,
+        nodes: dict[int, dict[str, Any]],
+        incoming_edges: dict[int, list[dict[str, Any]]],
+    ) -> float | None:
+        fiber_ids = [
+            node_id
+            for node_id, node in nodes.items()
+            if component_type_for_component(str(node.get("name", ""))) == "fiber"
+        ]
+        for fiber_id in sorted(fiber_ids):
+            power = self._upstream_power_dbm(fiber_id, nodes, incoming_edges, set())
+            if power is not None:
+                return power
+        return None
+
+    def _first_power_for_type(
+        self,
+        nodes: dict[int, dict[str, Any]],
+        incoming_edges: dict[int, list[dict[str, Any]]],
+        component_types: set[str],
+    ) -> float | None:
+        for node_id, node in sorted(nodes.items()):
+            component_type = component_type_for_component(str(node.get("name", "")))
+            if component_type in component_types:
+                power = self._node_output_power_dbm(node_id, nodes, incoming_edges, set())
+                if power is not None:
+                    return power
+        return None
+
+    def _upstream_power_dbm(
+        self,
+        node_id: int,
+        nodes: dict[int, dict[str, Any]],
+        incoming_edges: dict[int, list[dict[str, Any]]],
+        seen: set[int],
+    ) -> float | None:
+        for edge in incoming_edges.get(node_id, []):
+            try:
+                source_id = int(edge["source_id"])
+            except Exception:
+                continue
+            power = self._node_output_power_dbm(source_id, nodes, incoming_edges, seen)
+            if power is not None:
+                return power
+        return None
+
+    def _node_output_power_dbm(
+        self,
+        node_id: int,
+        nodes: dict[int, dict[str, Any]],
+        incoming_edges: dict[int, list[dict[str, Any]]],
+        seen: set[int],
+    ) -> float | None:
+        if node_id in seen:
+            return None
+        seen = set(seen)
+        seen.add(node_id)
+
+        node = nodes.get(node_id)
+        if not node:
+            return None
+
+        component_type = component_type_for_component(str(node.get("name", "")))
+        params = node.get("params") or {}
+
+        if component_type in {"lasercw", "laser"}:
+            return self._param_float(params, "Power")
+
+        if component_type in {"oa", "edfa"}:
+            mode = self._param_mode(params, output_power_default=True)
+            if mode == "gain":
+                upstream = self._upstream_power_dbm(node_id, nodes, incoming_edges, seen)
+                gain = self._param_float(params, "Gain")
+                if upstream is not None and gain is not None:
+                    return upstream + gain
+                return None
+            output_power = self._param_float(params, "OutputPower")
+            if output_power is not None:
+                return output_power
+
+        if component_type == "voa":
+            mode = self._param_mode(params, output_power_default=True)
+            if mode == "attenuation":
+                upstream = self._upstream_power_dbm(node_id, nodes, incoming_edges, seen)
+                attenuation = self._param_float(params, "Attenuation")
+                if upstream is not None and attenuation is not None:
+                    return upstream - attenuation
+                return None
+            output_power = self._param_float(params, "OutputPower")
+            if output_power is not None:
+                return output_power
+
+        return self._upstream_power_dbm(node_id, nodes, incoming_edges, seen)
+
+    def _param_float(self, params: dict[str, Any], name: str) -> float | None:
+        return self._float_or_none(self._param_value(params.get(name)))
+
+    def _param_mode(self, params: dict[str, Any], output_power_default: bool = True) -> str:
+        value = self._param_value(params.get("Mode"))
+        text = str(value if value is not None else "").strip().lower()
+        if "atten" in text or "衰减" in text:
+            return "attenuation"
+        if "gain" in text or "增益" in text:
+            return "gain"
+        return "outputpower" if output_power_default else text
 
     def _compute_power_budget(self, rows: list[dict[str, Any]], fec_limit: float = 1e-2) -> list[dict[str, Any]]:
         by_key: dict[tuple[float | None, int, str], list[dict[str, Any]]] = {}
@@ -300,6 +494,17 @@ class MatlabTopologyRunner:
             if (log_a - target) * (log_b - target) <= 0 and log_a != log_b:
                 ratio = (target - log_a) / (log_b - log_a)
                 return rop_a + ratio * (rop_b - rop_a)
+        if len(points) >= 2:
+            nearest = sorted(
+                points,
+                key=lambda item: abs(math.log10(item[1]) - target),
+            )[:2]
+            (rop_a, ber_a), (rop_b, ber_b) = sorted(nearest)
+            log_a = math.log10(ber_a)
+            log_b = math.log10(ber_b)
+            if log_a != log_b:
+                ratio = (target - log_a) / (log_b - log_a)
+                return rop_a + ratio * (rop_b - rop_a)
         return None
 
     @staticmethod
@@ -331,6 +536,8 @@ class MatlabTopologyRunner:
         component_type = component_type_for_component(component)
         param = parameter.strip().lower()
         if component_type in {"lasercw", "laser"} and param == "power":
+            return "tx_power_dbm"
+        if component_type in {"oa", "edfa"} and param == "outputpower":
             return "tx_power_dbm"
         if component_type == "voa" and param == "outputpower":
             return "rop_dbm"
@@ -454,12 +661,17 @@ class MatlabTopologyRunner:
         status = workspace.get("Status")
         if not status:
             return
-        parts = [f"{node.name}: {status}"]
-        if workspace.get("WaitingFor"):
-            parts.append(f"waiting_for={workspace['WaitingFor']}")
-        if workspace.get("Error"):
-            parts.append(f"error={workspace['Error']}")
-        self.log("; ".join(parts), "MATLAB")
+        if status == "called":
+            message = f"组件 {node.name} 已正确运行"
+        elif status == "waiting_for_inputs":
+            detail = workspace.get("WaitingFor")
+            message = f"组件 {node.name} 等待输入" + (f": {detail}" if detail else "")
+        elif status in {"call_failed", "failed"}:
+            detail = workspace.get("Error")
+            message = f"组件 {node.name} 运行失败" + (f": {detail}" if detail else "")
+        else:
+            message = f"组件 {node.name} 状态: {status}"
+        self.log(message, "MATLAB")
 
     def _log_final_metrics(self, outputs: dict[int, dict[str, Any]], topology: dict[str, Any]) -> None:
         nodes = topology.get("nodes", [])

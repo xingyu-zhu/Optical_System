@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 from pathlib import Path
 
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QAction, QFileDialog, QLabel, QMainWindow, QMessageBox, QSplitter, QToolBar, QVBoxLayout, QWidget
+from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QKeySequence
+from PyQt5.QtWidgets import QAction, QApplication, QFileDialog, QLabel, QMainWindow, QMessageBox, QProgressDialog, QSplitter, QStyle, QToolBar, QToolButton, QVBoxLayout, QWidget
 
 from component_panel import ComponentPanel
 from matlab_engine_manager import MatlabEngineManager
-from matlab_topology_runner import MatlabTopologyRunner
+from matlab_topology_runner import MatlabTopologyRunner, SimulationCancelled
 from output_widget import OutputWidget
 from parameter_sweep_dialog import ParameterSweepDialog
 from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
@@ -25,21 +26,58 @@ from topology_executor import TopologyCycleError, TopologyExecutor
 class MatlabTopologyWorker(QThread):
     log_message = pyqtSignal(str, str)
     finished_ok = pyqtSignal(object)
+    cancelled = pyqtSignal(str)
     failed = pyqtSignal(str)
 
     def __init__(self, engine_manager: MatlabEngineManager, topology: dict, parent=None):
         super().__init__(parent)
         self.engine_manager = engine_manager
         self.topology = topology
+        self.cancel_event = threading.Event()
+
+    def request_stop(self) -> None:
+        self.cancel_event.set()
 
     def run(self) -> None:
         try:
             runner = MatlabTopologyRunner(
                 self.engine_manager,
                 log=lambda message, source="INFO": self.log_message.emit(message, source),
+                cancel_event=self.cancel_event,
             )
             outputs = runner.run(self.topology)
             self.finished_ok.emit(outputs)
+        except SimulationCancelled as exc:
+            self.cancelled.emit(str(exc))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class MatlabShutdownWorker(QThread):
+    progress = pyqtSignal(str)
+    finished_ok = pyqtSignal()
+    failed = pyqtSignal(str)
+
+    def __init__(self, engine_manager: MatlabEngineManager, parent=None):
+        super().__init__(parent)
+        self.engine_manager = engine_manager
+
+    def run(self) -> None:
+        try:
+            if self.engine_manager.is_running():
+                eng = self.engine_manager.engine
+                if eng is not None:
+                    self.progress.emit("正在清理 MATLAB 工作区...")
+                    try:
+                        eng.eval(
+                            "try, close all hidden; clearvars; if usejava('jvm'), java.lang.System.gc(); end; drawnow; catch, end",
+                            nargout=0,
+                        )
+                    except Exception:
+                        pass
+                self.progress.emit("正在断开 MATLAB 引擎...")
+                self.engine_manager.stop()
+            self.finished_ok.emit()
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -56,6 +94,11 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.engine_manager = engine_manager
         self._simulation_worker = None
+        self._shutdown_worker = None
+        self._shutdown_dialog = None
+        self._shutdown_in_progress = False
+        self._allow_close_after_shutdown = False
+        self.stop_simulation_actions = []
         self._latest_topology = None
         self._latest_outputs = {}
         self._analysis_windows = []
@@ -72,6 +115,7 @@ class MainWindow(QMainWindow):
         self._create_tool_bars()
         self._create_status_area(initial_engine_status)
         self._connect_signals()
+        self._set_simulation_running(False)
         self._mark_design_clean()
 
     def _setup_central(self, engine_manager: MatlabEngineManager) -> None:
@@ -136,33 +180,37 @@ class MainWindow(QMainWindow):
         sim_menu.addAction(self._make_action("设计仿真", "F5", self._run_topology_simulation))
         sim_menu.addAction(self._make_action("参数扫描", None, self._configure_parameter_sweep))
         sim_menu.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
-        sim_menu.addAction(self._make_action("停止仿真", "Shift+F5", self._stub_action))
+        self.stop_simulation_action = self._make_action("停止仿真", "Shift+F5", self._stop_topology_simulation)
+        self.stop_simulation_actions.append(self.stop_simulation_action)
+        sim_menu.addAction(self.stop_simulation_action)
 
     def _create_tool_bars(self) -> None:
         file_tb = QToolBar("文件", self)
-        file_tb.addAction(self._make_action("新建", None, self._new_topology))
-        file_tb.addAction(self._make_action("打开", None, self._open_topology))
-        file_tb.addAction(self._make_action("保存", None, self._save_topology))
-        file_tb.addAction(self._make_action("另存为", None, self._save_topology_as))
+        self._add_toolbar_action(file_tb, "新建", "SP_FileIcon", self._new_topology)
+        self._add_toolbar_action(file_tb, "打开", "SP_DialogOpenButton", self._open_topology)
+        self._add_toolbar_action(file_tb, "保存", "SP_DialogSaveButton", self._save_topology)
+        self._add_toolbar_action(file_tb, "另存为", "SP_DriveFDIcon", self._save_topology_as)
         self.addToolBar(file_tb)
 
         edit_tb = QToolBar("编辑", self)
-        edit_tb.addAction(self._make_action("全选", None, self.workspace_panel.select_all))
-        edit_tb.addAction(self._make_action("删除", None, self.workspace_panel.delete_selected))
-        edit_tb.addAction(self._make_action("复制", None, self.workspace_panel.copy_selected))
-        edit_tb.addAction(self._make_action("粘贴", None, self.workspace_panel.paste_selected))
+        self._add_toolbar_action(edit_tb, "全选", "custom:select-all", self.workspace_panel.select_all)
+        self._add_toolbar_action(edit_tb, "删除", "custom:delete", self.workspace_panel.delete_selected)
+        self._add_toolbar_action(edit_tb, "复制", "SP_FileDialogDetailedView", self.workspace_panel.copy_selected)
+        self._add_toolbar_action(edit_tb, "粘贴", "custom:paste", self.workspace_panel.paste_selected)
         self.addToolBar(edit_tb)
 
         view_tb = QToolBar("视图", self)
-        view_tb.addAction(self._make_action("放大", None, self.workspace_panel.zoom_in))
-        view_tb.addAction(self._make_action("缩小", None, self.workspace_panel.zoom_out))
-        view_tb.addAction(self._make_action("重置", None, self.workspace_panel.reset_zoom))
+        self._add_toolbar_action(view_tb, "放大", "custom:zoom-in", self.workspace_panel.zoom_in)
+        self._add_toolbar_action(view_tb, "缩小", "custom:zoom-out", self.workspace_panel.zoom_out)
+        self._add_toolbar_action(view_tb, "重置", "SP_BrowserReload", self.workspace_panel.reset_zoom)
         self.addToolBar(view_tb)
 
         sim_tb = QToolBar("仿真", self)
-        sim_tb.addAction(self._make_action("运行", None, self._run_topology_simulation))
-        sim_tb.addAction(self._make_action("参数扫描", None, self._configure_parameter_sweep))
-        sim_tb.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
+        self._add_toolbar_action(sim_tb, "运行", "SP_MediaPlay", self._run_topology_simulation)
+        toolbar_stop_action = self._add_toolbar_action(sim_tb, "停止仿真", "SP_MediaStop", self._stop_topology_simulation)
+        self.stop_simulation_actions.append(toolbar_stop_action)
+        self._add_toolbar_action(sim_tb, "参数扫描", "custom:sweep", self._configure_parameter_sweep)
+        self._add_toolbar_action(sim_tb, "仿真结果", "SP_FileDialogContentsView", self._show_simulation_results)
         self.addToolBar(sim_tb)
 
     def _create_status_area(self, initial_engine_status: str) -> None:
@@ -193,6 +241,78 @@ class MainWindow(QMainWindow):
                 action.setShortcut(QKeySequence(shortcut))
         action.triggered.connect(callback)
         return action
+
+    def _add_toolbar_action(self, toolbar: QToolBar, text: str, icon_name: str, callback) -> QAction:
+        action = self._make_action(text, None, callback)
+        icon = self._standard_icon(icon_name)
+        if not icon.isNull():
+            action.setIcon(icon)
+            action.setText("")
+        action.setToolTip(text)
+        action.setStatusTip(text)
+        toolbar.addAction(action)
+
+        button = toolbar.widgetForAction(action)
+        if isinstance(button, QToolButton):
+            button.setToolButtonStyle(Qt.ToolButtonIconOnly if not icon.isNull() else Qt.ToolButtonTextOnly)
+            button.setAccessibleName(text)
+        return action
+
+    def _standard_icon(self, icon_name: str):
+        if icon_name.startswith("custom:"):
+            return self._custom_toolbar_icon(icon_name.removeprefix("custom:"))
+        pixmap_id = getattr(QStyle, icon_name, None)
+        if pixmap_id is None:
+            return QIcon()
+        return self.style().standardIcon(pixmap_id)
+
+    def _custom_toolbar_icon(self, name: str) -> QIcon:
+        pixmap = QPixmap(24, 24)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        ink = QColor("#26394d")
+        accent = QColor("#2f80c2")
+        painter.setPen(QPen(ink, 2.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+
+        if name == "select-all":
+            painter.setPen(QPen(ink, 1.6, Qt.DashLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawRoundedRect(4, 4, 16, 16, 2, 2)
+            painter.setPen(QPen(accent, 1.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawRoundedRect(8, 8, 8, 8, 1, 1)
+        elif name == "delete":
+            painter.setPen(QPen(QColor("#c62828"), 3.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawLine(6, 6, 18, 18)
+            painter.drawLine(18, 6, 6, 18)
+        elif name == "sweep":
+            painter.setPen(QPen(ink, 1.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawLine(4, 18, 20, 18)
+            painter.drawLine(4, 18, 4, 5)
+            painter.setPen(QPen(accent, 2.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawLine(5, 16, 9, 13)
+            painter.drawLine(9, 13, 13, 9)
+            painter.drawLine(13, 9, 19, 6)
+            painter.setBrush(accent)
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(7, 11, 4, 4)
+            painter.drawEllipse(15, 4, 4, 4)
+        elif name in {"zoom-in", "zoom-out"}:
+            painter.drawEllipse(4, 4, 12, 12)
+            painter.drawLine(14, 14, 20, 20)
+            painter.setPen(QPen(accent, 2.0, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(8, 10, 12, 10)
+            if name == "zoom-in":
+                painter.drawLine(10, 8, 10, 12)
+        elif name == "paste":
+            painter.drawRoundedRect(6, 5, 13, 16, 2, 2)
+            painter.setPen(QPen(accent, 2.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawRoundedRect(9, 3, 7, 4, 1, 1)
+            painter.drawLine(9, 11, 16, 11)
+            painter.drawLine(9, 15, 15, 15)
+
+        painter.end()
+        return QIcon(pixmap)
 
     def _new_topology(self) -> None:
         if not self._confirm_saved_or_continue():
@@ -367,8 +487,21 @@ class MainWindow(QMainWindow):
         self._simulation_worker = worker
         worker.log_message.connect(lambda message, source: self.output_widget.append_message(message, source=source))
         worker.finished_ok.connect(self._on_topology_simulation_finished)
+        worker.cancelled.connect(self._on_topology_simulation_cancelled)
         worker.failed.connect(self._on_topology_simulation_failed)
+        worker.finished.connect(lambda: self._set_simulation_running(False))
         worker.start()
+        self._set_simulation_running(True)
+
+    def _stop_topology_simulation(self) -> None:
+        worker = self._simulation_worker
+        if worker is None or not worker.isRunning():
+            self.output_widget.append_message("当前没有正在运行的设计仿真。", source="INFO")
+            return
+        worker.request_stop()
+        self._set_simulation_running(False)
+        self.status_label.setText("正在停止设计仿真")
+        self.output_widget.append_message("已请求停止仿真，正在等待当前 MATLAB 调用结束或取消。", source="INFO")
 
     def _configure_parameter_sweep(self) -> None:
         topology = self.workspace_panel.scene.serialize()
@@ -390,10 +523,17 @@ class MainWindow(QMainWindow):
 
     def _on_topology_simulation_finished(self, outputs: dict) -> None:
         self._latest_outputs = outputs or {}
+        self._simulation_worker = None
         self.status_label.setText("设计仿真完成")
         self.output_widget.append_message("设计仿真完成。双击光/电分析仪组件可查看对应结果。", source="INFO")
 
+    def _on_topology_simulation_cancelled(self, message: str) -> None:
+        self._simulation_worker = None
+        self.status_label.setText("设计仿真已停止")
+        self.output_widget.append_message(message or "设计仿真已停止。", source="INFO")
+
     def _on_topology_simulation_failed(self, message: str) -> None:
+        self._simulation_worker = None
         self.output_widget.append_message(f"MATLAB run error: {message}", source="ERROR")
         self.status_label.setText("设计仿真失败")
 
@@ -554,13 +694,70 @@ class MainWindow(QMainWindow):
         self.design_info_label.setText(f"组件: {component_count} | 连接: {connection_count}")
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        if self._confirm_saved_or_continue():
+        if self._allow_close_after_shutdown:
             event.accept()
-        else:
+            return
+        if self._shutdown_in_progress:
             event.ignore()
+            return
+        if not self._confirm_saved_or_continue():
+            event.ignore()
+            return
+        event.ignore()
+        self._begin_shutdown()
+
+    def _begin_shutdown(self) -> None:
+        if self._shutdown_in_progress:
+            return
+        self._shutdown_in_progress = True
+        self.update_engine_status("Disconnecting")
+
+        worker = self._simulation_worker
+        if worker is not None and worker.isRunning():
+            worker.request_stop()
+            self.output_widget.append_message("关闭程序前正在停止当前仿真。", source="INFO")
+
+        self._shutdown_dialog = QProgressDialog("正在断开 MATLAB 引擎，请稍候...", None, 0, 0, self)
+        self._shutdown_dialog.setWindowTitle("正在关闭")
+        self._shutdown_dialog.setWindowModality(Qt.ApplicationModal)
+        self._shutdown_dialog.setCancelButton(None)
+        self._shutdown_dialog.setMinimumDuration(0)
+        self._shutdown_dialog.show()
+        QApplication.processEvents()
+
+        shutdown_worker = MatlabShutdownWorker(self.engine_manager, self)
+        self._shutdown_worker = shutdown_worker
+        shutdown_worker.progress.connect(self._on_shutdown_progress)
+        shutdown_worker.finished_ok.connect(self._on_shutdown_finished)
+        shutdown_worker.failed.connect(self._on_shutdown_failed)
+        shutdown_worker.start()
+
+    def _on_shutdown_progress(self, message: str) -> None:
+        if self._shutdown_dialog is not None:
+            self._shutdown_dialog.setLabelText(message)
+
+    def _on_shutdown_finished(self) -> None:
+        self._finish_shutdown("Disconnected")
+
+    def _on_shutdown_failed(self, message: str) -> None:
+        if self.output_widget is not None:
+            self.output_widget.append_message(f"MATLAB disconnect error: {message}", source="ERROR")
+        self._finish_shutdown("Disconnect Error")
+
+    def _finish_shutdown(self, engine_status: str) -> None:
+        self.update_engine_status(engine_status)
+        if self._shutdown_dialog is not None:
+            self._shutdown_dialog.close()
+            self._shutdown_dialog = None
+        self._allow_close_after_shutdown = True
+        self.close()
 
     def _stub_action(self) -> None:
         self.output_widget.append_message("该功能正在重构中。", source="INFO")
+
+    def _set_simulation_running(self, running: bool) -> None:
+        for action in getattr(self, "stop_simulation_actions", []):
+            action.setEnabled(running)
 
     def update_engine_status(self, status: str) -> None:
         if hasattr(self, "engine_status_label"):

@@ -100,8 +100,9 @@ class MatlabEngineManager:
         """Stop current MATLAB Engine session if running."""
         with self._lock:
             if self._engine is not None:
-                self._engine.quit()
+                engine = self._engine
                 self._engine = None
+                engine.quit()
 
     def eval(self, command: str, nargout: int = 0, **kwargs: Any) -> Any:
         """Execute a MATLAB command string via eval."""

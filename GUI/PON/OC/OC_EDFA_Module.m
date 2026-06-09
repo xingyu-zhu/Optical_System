@@ -1,5 +1,5 @@
 function [E_out, Debug] = OC_EDFA_Module(E_in, Params)
-% EDFA_Module: Optical Amplifier (Power Controlled Mode)
+% EDFA_Module: Optical Amplifier (Power or Gain Controlled Mode)
 % based on VPIphotonics "AmpSysOpt" Datasheet.
 %
 % Functionality:
@@ -18,7 +18,9 @@ function [E_out, Debug] = OC_EDFA_Module(E_in, Params)
     % Defaults based on your screenshot
     EDFA_P = Params.Opt.Obj.Amp;
     
+    mode          = lower(char(getField(EDFA_P, 'Type', getField(EDFA_P, 'Mode', 'PowerControlled'))));
     TargetPower_W = getField(EDFA_P, 'OutputPower', 1e-3); % 1 mW
+    GainSet_dB    = getField(EDFA_P, 'Gain', 0);           % dB
     GainMax_dB    = getField(EDFA_P, 'GainMax', 100);      % 100 dB
     NF_dB         = getField(EDFA_P, 'NoiseFigure', 4.0);  % 4 dB
     
@@ -37,14 +39,16 @@ function [E_out, Debug] = OC_EDFA_Module(E_in, Params)
     Fs = Params.Fs_Tx;
     [N, nPol] = size(E_in);
 
-    %% 2. Calculate Gain (Power Controlled Mode)
-    % Manual Page 7: "G(f) = G_ss / k, where k is ratio of unscaled output to desired"
+    %% 2. Calculate Gain
+    % Power mode keeps the original behavior. Gain mode applies a fixed gain
+    % and still uses GainMax as a safety clamp.
     
     % Calculate Input Power (Sum of both polarizations)
     P_in_Total = mean(sum(abs(E_in).^2, 2));
     
-    % Calculate Required Linear Gain
-    if P_in_Total > 0
+    if contains(mode, 'gain')
+        Gain_Lin = 10^(GainSet_dB / 10);
+    elseif P_in_Total > 0
         Gain_Lin = TargetPower_W / P_in_Total;
     else
         Gain_Lin = 1; % No input, unity gain
@@ -95,7 +99,13 @@ function [E_out, Debug] = OC_EDFA_Module(E_in, Params)
     E_out(:,2) = E_Amp(:,2) + Noise_Y;
 
     %% 5. Debug Info
+    Debug.Mode = mode;
     Debug.AppliedGain_dB = 10*log10(Gain_Lin);
+    if contains(mode, 'gain')
+        Debug.GainSetting_dB = GainSet_dB;
+    else
+        Debug.TargetOutputPower_dBm = 10*log10(TargetPower_W * 1000);
+    end
     Debug.OutputPower_dBm = 10*log10(mean(sum(abs(E_out).^2, 2)) * 1000);
     
     % Theoretical OSNR (0.1nm RBW)

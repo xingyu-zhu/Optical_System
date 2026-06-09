@@ -85,7 +85,7 @@ class ParameterSweepDialog(QDialog):
                     "start": self._text_item(row, 4),
                     "stop": self._text_item(row, 5),
                     "step": self._text_item(row, 6),
-                    "unit": self._text_item(row, 7),
+                    "unit": self._current_param_unit(row),
                 }
             )
         return sweeps
@@ -122,8 +122,7 @@ class ParameterSweepDialog(QDialog):
         self.table.setItem(row, 4, QTableWidgetItem(str(sweep.get("start", ""))))
         self.table.setItem(row, 5, QTableWidgetItem(str(sweep.get("stop", ""))))
         self.table.setItem(row, 6, QTableWidgetItem(str(sweep.get("step", "1"))))
-        unit = str(sweep.get("unit", "")) or self._current_param_unit(row)
-        self.table.setItem(row, 7, QTableWidgetItem(unit))
+        self._set_readonly_item(row, 7, self._current_param_unit(row))
 
     def _refresh_param_combo(self, row: int, preferred: str = "") -> None:
         node_combo = self.table.cellWidget(row, 2)
@@ -141,12 +140,10 @@ class ParameterSweepDialog(QDialog):
             if index >= 0:
                 param_combo.setCurrentIndex(index)
         param_combo.blockSignals(False)
-        unit_item = self.table.item(row, 7)
-        if unit_item is None or not unit_item.text().strip():
-            self.table.setItem(row, 7, QTableWidgetItem(self._current_param_unit(row)))
+        self._sync_unit(row)
 
     def _sync_unit(self, row: int) -> None:
-        self.table.setItem(row, 7, QTableWidgetItem(self._current_param_unit(row)))
+        self._set_readonly_item(row, 7, self._current_param_unit(row))
 
     def _current_param_unit(self, row: int) -> str:
         node_combo = self.table.cellWidget(row, 2)
@@ -168,6 +165,11 @@ class ParameterSweepDialog(QDialog):
     def _text_item(self, row: int, col: int) -> str:
         item = self.table.item(row, col)
         return item.text().strip() if item else ""
+
+    def _set_readonly_item(self, row: int, col: int, text: str) -> None:
+        item = QTableWidgetItem(str(text))
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        self.table.setItem(row, col, item)
 
     def _int_item(self, row: int, col: int, default: int) -> int:
         try:

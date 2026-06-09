@@ -56,8 +56,7 @@ class StartupWindow(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
 
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
+        self.progress_bar.setRange(0, 0)
 
         layout = QVBoxLayout(self)
         layout.addStretch(1)
@@ -69,7 +68,6 @@ class StartupWindow(QWidget):
         layout.addStretch(1)
 
     def update_progress(self, value: int, text: str) -> None:
-        self.progress_bar.setValue(value)
         self.status_label.setText(text)
 
 

@@ -28,6 +28,32 @@ class MatlabConnectWorker(QThread):
             self.failed.emit(str(exc))
 
 
+class MatlabDisconnectWorker(QThread):
+    disconnected = pyqtSignal()
+    failed = pyqtSignal(str)
+
+    def __init__(self, engine_manager: MatlabEngineManager):
+        super().__init__()
+        self.engine_manager = engine_manager
+
+    def run(self) -> None:
+        try:
+            if self.engine_manager.is_running():
+                eng = self.engine_manager.engine
+                if eng is not None:
+                    try:
+                        eng.eval(
+                            "try, close all hidden; clearvars; if usejava('jvm'), java.lang.System.gc(); end; drawnow; catch, end",
+                            nargout=0,
+                        )
+                    except Exception:
+                        pass
+                self.engine_manager.stop()
+            self.disconnected.emit()
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class OutputWidget(QWidget):
     """Standalone output widget connected to MatlabEngineManager."""
 
@@ -43,6 +69,7 @@ class OutputWidget(QWidget):
         self.show_timestamp = show_timestamp
         self.engine_manager = engine_manager or MatlabEngineManager()
         self._connect_worker = None
+        self._disconnect_worker = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -60,6 +87,10 @@ class OutputWidget(QWidget):
         self.connect_btn = QPushButton("连接 MATLAB 引擎")
         self.connect_btn.clicked.connect(self.connect_matlab)
 
+        self.disconnect_btn = QPushButton("断开 MATLAB 引擎")
+        self.disconnect_btn.clicked.connect(self.disconnect_matlab)
+        self.disconnect_btn.setEnabled(self.engine_manager.is_running())
+
         clear_btn = QPushButton("清除")
         clear_btn.clicked.connect(self.clear)
 
@@ -70,6 +101,7 @@ class OutputWidget(QWidget):
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.connect_btn)
+        button_row.addWidget(self.disconnect_btn)
         button_row.addStretch(1)
         button_row.addWidget(clear_btn)
 
@@ -120,13 +152,46 @@ class OutputWidget(QWidget):
         worker.finished.connect(lambda: self.connect_btn.setEnabled(True))
         worker.start()
 
+    def disconnect_matlab(self) -> None:
+        """Disconnect MATLAB engine asynchronously and log status."""
+        if self._disconnect_worker is not None and self._disconnect_worker.isRunning():
+            return
+        if self._connect_worker is not None and self._connect_worker.isRunning():
+            self.append_message("MATLAB 引擎仍在连接中，请稍后再断开。", source="INFO")
+            return
+
+        self.engine_status_changed.emit("Disconnecting")
+        self.connect_btn.setEnabled(False)
+        self.disconnect_btn.setEnabled(False)
+        self.append_matlab("正在断开 MATLAB 引擎...")
+
+        worker = MatlabDisconnectWorker(self.engine_manager)
+        self._disconnect_worker = worker
+        worker.disconnected.connect(self._on_disconnect_success)
+        worker.failed.connect(self._on_disconnect_failed)
+        worker.finished.connect(self._on_disconnect_finished)
+        worker.start()
+
     def _on_connect_success(self, engine: object) -> None:
         self.append_matlab(f"Engine ready: {engine}")
         self.engine_status_changed.emit("Ready")
+        self.disconnect_btn.setEnabled(True)
 
     def _on_connect_failed(self, error_text: str) -> None:
         self.append_message(f"Failed to connect MATLAB: {error_text}", source="ERROR")
         self.engine_status_changed.emit("Error")
+
+    def _on_disconnect_success(self) -> None:
+        self.append_matlab("MATLAB 引擎已断开。")
+        self.engine_status_changed.emit("Disconnected")
+
+    def _on_disconnect_failed(self, error_text: str) -> None:
+        self.append_message(f"Failed to disconnect MATLAB: {error_text}", source="ERROR")
+        self.engine_status_changed.emit("Disconnect Error")
+
+    def _on_disconnect_finished(self) -> None:
+        self.connect_btn.setEnabled(True)
+        self.disconnect_btn.setEnabled(self.engine_manager.is_running())
 
     def log_python_output(self, message: str) -> None:
         self.append_python(message)

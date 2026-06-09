@@ -76,14 +76,20 @@ DEFAULT_COMPONENT_PARAMS: dict[str, dict[str, list[str]]] = {
         "Comment": ["", "", "备注"],
     },
     "VOA": {
+        "Mode": ["OutputPower", "", "工作模式"],
         "OutputPower": ["0", "dBm", "VOA的输出功率"],
+        "Attenuation": ["0", "dB", "衰减量"],
     },
     "OA": {
+        "Mode": ["OutputPower", "", "工作模式"],
         "OutputPower": ["0", "dBm", "EDFA 输出功率"],
+        "Gain": ["0", "dB", "光放大器增益"],
         "NF": ["4", "dB", "噪声系数"],
     },
     "EDFA": {
+        "Mode": ["OutputPower", "", "工作模式"],
         "OutputPower": ["0", "dBm", "EDFA 输出功率"],
+        "Gain": ["0", "dB", "光放大器增益"],
         "NF": ["4", "dB", "噪声系数"],
     },
     "Fiber": {
@@ -148,6 +154,7 @@ class ComponentParameterDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f"编辑参数 - {component_name}")
         self.resize(620, 420)
+        self.component_name = component_name
         self._params = params
 
         layout = QVBoxLayout(self)
@@ -158,6 +165,7 @@ class ComponentParameterDialog(QDialog):
         self.table.horizontalHeader().setStretchLastSection(True)
 
         self._load_params()
+        self._apply_mode_visibility()
         layout.addWidget(self.table)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
@@ -176,7 +184,15 @@ class ComponentParameterDialog(QDialog):
             key_item = QTableWidgetItem(k)
             key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(row, 0, key_item)
-            if k == "Modulation":
+            if k == "Mode":
+                combo = QComboBox(self.table)
+                combo.addItems(self._mode_options())
+                current = self._normalize_mode(value)
+                if current in [combo.itemText(i) for i in range(combo.count())]:
+                    combo.setCurrentText(current)
+                combo.currentTextChanged.connect(self._apply_mode_visibility)
+                self.table.setCellWidget(row, 1, combo)
+            elif k == "Modulation":
                 combo = QComboBox(self.table)
                 combo.addItems(["QPSK", "16QAM"])
                 current = str(value).upper().replace("-", "")
@@ -191,6 +207,45 @@ class ComponentParameterDialog(QDialog):
                 self.table.setItem(row, 1, QTableWidgetItem(str(value)))
             self.table.setItem(row, 2, QTableWidgetItem(str(unit)))
             self.table.setItem(row, 3, QTableWidgetItem(str(desc)))
+
+    def _apply_mode_visibility(self, *_args) -> None:
+        mode = self._current_mode()
+        component = self.component_name.strip().lower()
+        for row in range(self.table.rowCount()):
+            key = self.table.item(row, 0).text().strip()
+            hidden = False
+            if component in {"oa", "edfa"}:
+                hidden = (mode == "OutputPower" and key == "Gain") or (mode == "Gain" and key == "OutputPower")
+            elif component == "voa":
+                hidden = (mode == "OutputPower" and key == "Attenuation") or (mode == "Attenuation" and key == "OutputPower")
+            self.table.setRowHidden(row, hidden)
+
+    def _current_mode(self) -> str:
+        for row in range(self.table.rowCount()):
+            key_item = self.table.item(row, 0)
+            if key_item is not None and key_item.text().strip() == "Mode":
+                widget = self.table.cellWidget(row, 1)
+                if isinstance(widget, QComboBox):
+                    return widget.currentText()
+                value_item = self.table.item(row, 1)
+                if value_item is not None:
+                    return self._normalize_mode(value_item.text())
+        return "OutputPower"
+
+    def _mode_options(self) -> list[str]:
+        component = self.component_name.strip().lower()
+        if component == "voa":
+            return ["OutputPower", "Attenuation"]
+        return ["OutputPower", "Gain"]
+
+    def _normalize_mode(self, value) -> str:
+        text = str(value).strip().lower()
+        component = self.component_name.strip().lower()
+        if component == "voa" and any(token in text for token in ("atten", "衰减")):
+            return "Attenuation"
+        if component in {"oa", "edfa"} and any(token in text for token in ("gain", "增益")):
+            return "Gain"
+        return "OutputPower"
 
     def get_params(self) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {}
@@ -358,6 +413,7 @@ class TopologyScene(QGraphicsScene):
         self._next_id = 1
         self._drag_port: PortItem | None = None
         self._preview_line: QGraphicsLineItem | None = None
+        self._press_node_positions: dict[NodeItem, QPointF] = {}
         self.sweep_config: list[dict] = []
 
     def dragMoveEvent(self, event) -> None:  # noqa: N802
@@ -379,6 +435,11 @@ class TopologyScene(QGraphicsScene):
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton:
+            self._press_node_positions = {
+                item: QPointF(item.pos())
+                for item in self.items()
+                if isinstance(item, NodeItem)
+            }
             port = self._port_at(event.scenePos())
             if port is not None and port.kind == "out":
                 self._start_port_drag(port)
@@ -402,6 +463,16 @@ class TopologyScene(QGraphicsScene):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton:
+            moved_nodes = [
+                item
+                for item in self.selectedItems()
+                if isinstance(item, NodeItem)
+                and item in self._press_node_positions
+                and item.pos() != self._press_node_positions[item]
+            ]
+            self._resolve_node_overlaps(moved_nodes)
+            self._press_node_positions = {}
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
         for item in self.items(event.scenePos()):
@@ -429,6 +500,51 @@ class TopologyScene(QGraphicsScene):
         src = port.scenePos()
         self._preview_line.setLine(src.x(), src.y(), src.x(), src.y())
         self.addItem(self._preview_line)
+
+    def _resolve_node_overlaps(self, nodes_to_move: list[NodeItem]) -> None:
+        if not nodes_to_move:
+            return
+
+        all_nodes = [item for item in self.items() if isinstance(item, NodeItem)]
+        moving_set = set(nodes_to_move)
+        changed = False
+        for node in nodes_to_move:
+            for _ in range(12):
+                other = self._first_overlapping_node(node, all_nodes, moving_set)
+                if other is None:
+                    break
+                node.setPos(self._non_overlapping_position(node, other))
+                changed = True
+        if changed:
+            self._emit_design_changed()
+
+    @staticmethod
+    def _first_overlapping_node(
+        node: NodeItem,
+        all_nodes: list[NodeItem],
+        moving_set: set[NodeItem],
+    ) -> NodeItem | None:
+        for other in all_nodes:
+            if other is node or other in moving_set:
+                continue
+            if node.sceneBoundingRect().intersects(other.sceneBoundingRect()):
+                return other
+        return None
+
+    @staticmethod
+    def _non_overlapping_position(node: NodeItem, other: NodeItem) -> QPointF:
+        node_center = node.sceneBoundingRect().center()
+        other_center = other.sceneBoundingRect().center()
+        dx = node_center.x() - other_center.x()
+        dy = node_center.y() - other_center.y()
+        gap = 10.0
+
+        if abs(dx) >= abs(dy):
+            x = other.pos().x() + (NodeItem.WIDTH + gap if dx >= 0 else -(NodeItem.WIDTH + gap))
+            return QPointF(x, node.pos().y())
+
+        y = other.pos().y() + (NodeItem.HEIGHT + gap if dy >= 0 else -(NodeItem.HEIGHT + gap))
+        return QPointF(node.pos().x(), y)
 
     def _finish_port_drag(self, target_port: PortItem | None) -> None:
         source_port = self._drag_port
@@ -462,6 +578,7 @@ class TopologyScene(QGraphicsScene):
         self._next_id += 1
         node.setPos(pos)
         self.addItem(node)
+        self._resolve_node_overlaps([node])
         self._refresh_node_display_names()
         self._emit_counts()
         return node
@@ -760,10 +877,8 @@ class WorkspacePanel(QWidget):
 
         title = QLabel("工作区")
         title.setObjectName("panelTitle")
-
-        hint = QLabel("拖拽组件到工作区；双击组件编辑参数；支持连线、框选、复制粘贴、删除与缩放。")
-        hint.setObjectName("panelBody")
-        hint.setAlignment(Qt.AlignLeft)
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 12pt; font-weight: 700;")
 
         self.scene = TopologyScene(self)
         self.scene.topology_changed.connect(self.topology_changed.emit)
@@ -777,7 +892,6 @@ class WorkspacePanel(QWidget):
         self.view.select_all_requested.connect(self.select_all)
 
         layout.addWidget(title)
-        layout.addWidget(hint)
         layout.addWidget(self.view, 1)
 
     def _setup_shortcuts(self) -> None:

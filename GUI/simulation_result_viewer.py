@@ -13,6 +13,7 @@ os.environ.setdefault("XDG_CACHE_HOME", str(_MPL_CACHE))
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib import rcParams
 from PyQt5.QtWidgets import QDialog, QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from signal_plotter import (
@@ -24,6 +25,18 @@ from signal_plotter import (
     float_or_default,
     scalar_text,
 )
+
+rcParams["font.sans-serif"] = [
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Heiti SC",
+    "Arial Unicode MS",
+    "Noto Sans CJK SC",
+    "Microsoft YaHei",
+    "SimHei",
+    "DejaVu Sans",
+]
+rcParams["axes.unicode_minus"] = False
 
 
 class AnalyzerPlotDialog(QDialog):
@@ -247,40 +260,57 @@ class SimulationResultDialog(QDialog):
         fig = Figure(figsize=(7.8, 4.6), tight_layout=True)
         canvas = FigureCanvas(fig)
         ax = fig.add_subplot(111)
-        if budget_rows:
-            x = [float(item["tx_power_dbm"]) for item in budget_rows if item.get("power_budget_db") is not None]
-            y = [float(item["power_budget_db"]) for item in budget_rows if item.get("power_budget_db") is not None]
-            if x and y:
-                ax.plot(x, y, "-o", color="#2f7d4f", linewidth=2.0)
-                ax.set_title("功率预算 vs 发射功率")
-                ax.set_xlabel("发射光功率 (dBm)")
-                ax.set_ylabel("功率预算 (dB)")
-            else:
-                ax.text(0.5, 0.5, "BER 扫描点不足，无法插值功率预算", ha="center", va="center", transform=ax.transAxes)
-        else:
-            ax.text(0.5, 0.5, "暂无功率预算数据", ha="center", va="center", transform=ax.transAxes)
+        plotted = self._scatter_budget_metric(
+            ax,
+            budget_rows,
+            y_key="power_budget_db",
+            title="功率预算 vs 发射功率",
+            y_label="功率预算 (dB)",
+        )
+        if not plotted:
+            message = "BER 扫描点不足，无法插值功率预算" if budget_rows else "暂无功率预算数据"
+            ax.text(0.5, 0.5, message, ha="center", va="center", transform=ax.transAxes)
         ax.grid(True, alpha=0.25)
         canvas.draw()
         tab.addTab(canvas, "功率预算图")
+
+        fig_sens = Figure(figsize=(7.8, 4.6), tight_layout=True)
+        canvas_sens = FigureCanvas(fig_sens)
+        ax_sens = fig_sens.add_subplot(111)
+        plotted_sens = self._scatter_budget_metric(
+            ax_sens,
+            budget_rows,
+            y_key="sensitivity_dbm",
+            title="接收机灵敏度 vs 发射功率",
+            y_label="接收机灵敏度 (dBm @ BER=1e-2)",
+        )
+        if not plotted_sens:
+            message = "BER 扫描点不足，无法插值接收机灵敏度" if budget_rows else "暂无接收机灵敏度数据"
+            ax_sens.text(0.5, 0.5, message, ha="center", va="center", transform=ax_sens.transAxes)
+        ax_sens.grid(True, alpha=0.25)
+        canvas_sens.draw()
+        tab.addTab(canvas_sens, "接收机灵敏度")
 
         fig2 = Figure(figsize=(7.8, 4.6), tight_layout=True)
         canvas2 = FigureCanvas(fig2)
         ax2 = fig2.add_subplot(111)
         plotted = False
-        grouped: dict[Any, list[dict[str, Any]]] = {}
+        grouped: dict[tuple[str, Any], list[dict[str, Any]]] = {}
         for row in sweep_rows:
             if row.get("rop_dbm") is None or row.get("BER") is None:
                 continue
-            grouped.setdefault(row.get("tx_power_dbm"), []).append(row)
-        for tx_power, group in sorted(grouped.items(), key=lambda item: (item[0] is None, item[0])):
+            key = (str(row.get("component", "Receiver")), row.get("tx_power_dbm"))
+            grouped.setdefault(key, []).append(row)
+        for (component, tx_power), group in sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1] is None, item[0][1])):
             group = sorted(group, key=lambda item: float(item["rop_dbm"]))
             x = [float(item["rop_dbm"]) for item in group]
             y = [max(float(item["BER"]), 1e-12) for item in group]
             if x and y:
-                label = f"Tx={scalar_text(tx_power)} dBm" if tx_power is not None else "BER"
-                ax2.semilogy(x, y, "-o", linewidth=1.8, label=label)
+                tx_label = f", Tx={scalar_text(tx_power)} dBm" if tx_power is not None else ""
+                ax2.scatter(x, y, s=38, alpha=0.85, label=f"{component}{tx_label}")
                 plotted = True
         if plotted:
+            ax2.set_yscale("log")
             ax2.axhline(1e-2, color="0.25", linestyle="--", linewidth=1.0, label="FEC=1e-2")
             ax2.set_title("BER vs 接收光功率")
             ax2.set_xlabel("接收光功率 (dBm)")
@@ -293,6 +323,31 @@ class SimulationResultDialog(QDialog):
         tab.addTab(canvas2, "BER曲线")
 
         self.tabs.addTab(tab, "功率预算")
+
+    @staticmethod
+    def _scatter_budget_metric(ax, budget_rows: list[dict[str, Any]], y_key: str, title: str, y_label: str) -> bool:
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for item in budget_rows:
+            if item.get("tx_power_dbm") is None or item.get(y_key) is None:
+                continue
+            grouped.setdefault(str(item.get("component", "Receiver")), []).append(item)
+
+        plotted = False
+        for component, group in sorted(grouped.items()):
+            x = [float(item["tx_power_dbm"]) for item in group]
+            y = [float(item[y_key]) for item in group]
+            if not x or not y:
+                continue
+            ax.scatter(x, y, s=48, alpha=0.85, label=component)
+            plotted = True
+
+        if plotted:
+            ax.set_title(title)
+            ax.set_xlabel("发射光功率 (dBm)")
+            ax.set_ylabel(y_label)
+            if len(grouped) > 1:
+                ax.legend(loc="best", fontsize=8)
+        return plotted
 
     @staticmethod
     def _sweep_values_text(values: Any) -> str:
