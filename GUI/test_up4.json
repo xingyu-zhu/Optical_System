@@ -4,8 +4,8 @@
       "id": 31,
       "name": "O-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1630.7078397656237,
-      "y": 890.5283947656245,
+      "x": 1686.6760397656233,
+      "y": 1375.0031260156245,
       "params": {
         "Enabled": [
           "True",
@@ -23,8 +23,8 @@
       "id": 30,
       "name": "Combiner",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/combiner.jpg",
-      "x": 1331.8514478437503,
-      "y": 1138.452640671875,
+      "x": 1683.4017040937501,
+      "y": 1178.679784421875,
       "params": {
         "Enabled": [
           "True",
@@ -42,8 +42,8 @@
       "id": 29,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 998.0,
-      "y": 1884.0,
+      "x": 508.2782500000005,
+      "y": 1672.37024375,
       "params": {
         "Vpi": [
           "3",
@@ -61,8 +61,8 @@
       "id": 28,
       "name": "DAC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
-      "x": 820.0,
-      "y": 1724.0,
+      "x": 363.5093687500002,
+      "y": 1524.6132875,
       "params": {
         "ElectricalBandwidth": [
           "32",
@@ -80,8 +80,8 @@
       "id": 27,
       "name": "ONUTxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
-      "x": 646.0,
-      "y": 1722.0,
+      "x": 186.01135625000026,
+      "y": 1524.36229375,
       "params": {
         "TransmitFrequency": [
           "193.1",
@@ -114,8 +114,8 @@
       "id": 26,
       "name": "LaserCW",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
-      "x": 841.0,
-      "y": 1884.0,
+      "x": 365.2703000000002,
+      "y": 1672.3702437500008,
       "params": {
         "Power": [
           "13",
@@ -143,8 +143,8 @@
       "id": 25,
       "name": "Driver",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
-      "x": 1002.0,
-      "y": 1734.0,
+      "x": 508.78023750000045,
+      "y": 1525.8682562500003,
       "params": {
         "Gain": [
           "2",
@@ -162,8 +162,8 @@
       "id": 24,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 986.0,
-      "y": 1605.0,
+      "x": 505.0232812500004,
+      "y": 1337.4020437500003,
       "params": {
         "Vpi": [
           "3",
@@ -181,8 +181,8 @@
       "id": 23,
       "name": "DAC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
-      "x": 797.0,
-      "y": 1432.0,
+      "x": 351.0034062500003,
+      "y": 1185.39011875,
       "params": {
         "ElectricalBandwidth": [
           "32",
@@ -200,8 +200,8 @@
       "id": 22,
       "name": "ONUTxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
-      "x": 623.0,
-      "y": 1430.0,
+      "x": 171.7563875000003,
+      "y": 1185.1391250000004,
       "params": {
         "TransmitFrequency": [
           "193.1",
@@ -234,8 +234,8 @@
       "id": 21,
       "name": "LaserCW",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
-      "x": 829.0,
-      "y": 1605.0,
+      "x": 348.0232812500003,
+      "y": 1337.4020437500003,
       "params": {
         "Power": [
           "13",
@@ -263,8 +263,8 @@
       "id": 20,
       "name": "Driver",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
-      "x": 979.0,
-      "y": 1442.0,
+      "x": 505.01930625000045,
+      "y": 1184.8960812500002,
       "params": {
         "Gain": [
           "2",
@@ -282,8 +282,8 @@
       "id": 19,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 1076.0,
-      "y": 1348.0,
+      "x": 502.3259500000006,
+      "y": 1047.1709250000006,
       "params": {
         "Vpi": [
           "3",
@@ -301,8 +301,8 @@
       "id": 18,
       "name": "DAC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
-      "x": 898.0,
-      "y": 1188.0,
+      "x": 340.0670062500005,
+      "y": 894.1669500000003,
       "params": {
         "ElectricalBandwidth": [
           "32",
@@ -320,8 +320,8 @@
       "id": 17,
       "name": "ONUTxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
-      "x": 724.0,
-      "y": 1186.0,
+      "x": 162.56899375000032,
+      "y": 895.6649625000005,
       "params": {
         "TransmitFrequency": [
           "193.1",
@@ -354,8 +354,8 @@
       "id": 16,
       "name": "LaserCW",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
-      "x": 919.0,
-      "y": 1348.0,
+      "x": 348.8239625000005,
+      "y": 1047.1709250000004,
       "params": {
         "Power": [
           "13",
@@ -383,8 +383,8 @@
       "id": 15,
       "name": "Driver",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
-      "x": 1080.0,
-      "y": 1198.0,
+      "x": 502.8279375000006,
+      "y": 893.6729125000005,
       "params": {
         "Gain": [
           "2",
@@ -402,8 +402,8 @@
       "id": 1,
       "name": "ONUTxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
-      "x": 698.0,
-      "y": 919.0,
+      "x": 150.56104375000027,
+      "y": 577.94378125,
       "params": {
         "TransmitFrequency": [
           "193.1",
@@ -436,8 +436,8 @@
       "id": 2,
       "name": "DAC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
-      "x": 872.0,
-      "y": 921.0,
+      "x": 321.0630312500003,
+      "y": 578.194775,
       "params": {
         "ElectricalBandwidth": [
           "32",
@@ -455,8 +455,8 @@
       "id": 3,
       "name": "Driver",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
-      "x": 1054.0,
-      "y": 931.0,
+      "x": 497.8160125000005,
+      "y": 577.7007375000002,
       "params": {
         "Gain": [
           "2",
@@ -474,8 +474,8 @@
       "id": 4,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 1050.0,
-      "y": 1081.0,
+      "x": 499.06303125000045,
+      "y": 727.7007375000001,
       "params": {
         "Vpi": [
           "3",
@@ -493,8 +493,8 @@
       "id": 5,
       "name": "LaserCW",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
-      "x": 893.0,
-      "y": 1081.0,
+      "x": 342.0630312500005,
+      "y": 727.7007375000002,
       "params": {
         "Power": [
           "13",
@@ -522,8 +522,8 @@
       "id": 6,
       "name": "Fiber",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/fiber.jpg",
-      "x": 1535.0,
-      "y": 1139.0,
+      "x": 1881.3032374999998,
+      "y": 1179.22714375,
       "params": {
         "Length": [
           "20",
@@ -551,8 +551,8 @@
       "id": 8,
       "name": "OA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
-      "x": 1695.0,
-      "y": 1145.0,
+      "x": 2046.55025625,
+      "y": 1178.23111875,
       "params": {
         "OutputPower": [
           "0",
@@ -570,8 +570,8 @@
       "id": 9,
       "name": "ICR",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1885.0,
-      "y": 1136.0,
+      "x": 2224.3072125,
+      "y": 1177.97615,
       "params": {
         "Bandwidth": [
           "25",
@@ -604,8 +604,8 @@
       "id": 10,
       "name": "TIA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 2025.0,
-      "y": 1132.0,
+      "x": 2376.55025625,
+      "y": 1177.4741624999997,
       "params": {
         "Bandwidth": [
           "35",
@@ -623,8 +623,8 @@
       "id": 11,
       "name": "LO",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1884.0,
-      "y": 981.0,
+      "x": 2225.0562187500004,
+      "y": 1021.2271437499999,
       "params": {
         "Power": [
           "13",
@@ -657,8 +657,8 @@
       "id": 12,
       "name": "ADC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 2180.0,
-      "y": 1135.0,
+      "x": 2531.5502562499996,
+      "y": 1178.7251562499996,
       "params": {
         "Bandwidth": [
           "59",
@@ -681,8 +681,8 @@
       "id": 13,
       "name": "OLTRxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 2345.0,
-      "y": 1135.0,
+      "x": 2694.80125,
+      "y": 1178.7251562499998,
       "params": {
         "Modulation": [
           "QPSK",
@@ -710,8 +710,8 @@
       "id": 14,
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 2524.0,
-      "y": 1135.0,
+      "x": 2875.55025625,
+      "y": 1178.72515625,
       "params": {
         "Enabled": [
           "True",
@@ -727,12 +727,6 @@
     }
   ],
   "edges": [
-    {
-      "source_id": 30,
-      "source_side": "right",
-      "target_id": 31,
-      "target_side": "left"
-    },
     {
       "source_id": 29,
       "source_side": "right",
@@ -900,6 +894,12 @@
       "source_side": "right",
       "target_id": 14,
       "target_side": "left"
+    },
+    {
+      "source_id": 30,
+      "source_side": "bottom",
+      "target_id": 31,
+      "target_side": "top"
     }
   ],
   "parameter_sweeps": []

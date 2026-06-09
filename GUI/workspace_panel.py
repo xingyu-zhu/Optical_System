@@ -328,6 +328,9 @@ class NodeItem(QGraphicsRectItem):
         if change == QGraphicsItem.ItemPositionHasChanged:
             for edge in self.edges:
                 edge.update_position()
+            scene = self.scene()
+            if scene is not None and hasattr(scene, "_emit_design_changed"):
+                scene._emit_design_changed()
         elif change == QGraphicsItem.ItemSelectedHasChanged:
             self.highlight_rect.setVisible(bool(value))
         return super().itemChange(change, value)
@@ -346,6 +349,7 @@ class NodeItem(QGraphicsRectItem):
 
 class TopologyScene(QGraphicsScene):
     topology_changed = pyqtSignal(int, int)
+    design_changed = pyqtSignal()
     node_double_clicked = pyqtSignal(object)
 
     def __init__(self, parent=None):
@@ -450,6 +454,7 @@ class TopologyScene(QGraphicsScene):
     def create_node(self, name: str, icon_path: str, pos: QPointF) -> NodeItem:
         resolved_icon = resolve_icon_path(name, icon_path)
         default_params = self._default_params(name)
+        self._sync_next_id()
         node = NodeItem(
             self._next_id,
             ComponentMeta(name=name, icon_path=resolved_icon, params=default_params),
@@ -501,6 +506,7 @@ class TopologyScene(QGraphicsScene):
                     self._remove_edge(edge)
                 self.removeItem(item)
         self._refresh_node_display_names()
+        self._sync_next_id()
         self._emit_counts()
 
     def delete_at(self, scene_pos: QPointF) -> None:
@@ -641,12 +647,21 @@ class TopologyScene(QGraphicsScene):
         component_count = sum(1 for item in self.items() if isinstance(item, NodeItem))
         connection_count = sum(1 for item in self.items() if isinstance(item, EdgeItem))
         self.topology_changed.emit(component_count, connection_count)
+        self._emit_design_changed()
+
+    def _sync_next_id(self) -> None:
+        node_ids = [item.node_id for item in self.items() if isinstance(item, NodeItem)]
+        self._next_id = max(node_ids, default=0) + 1
+
+    def _emit_design_changed(self) -> None:
+        self.design_changed.emit()
 
 
 class WorkspaceView(QGraphicsView):
     delete_requested = pyqtSignal()
     copy_requested = pyqtSignal()
     paste_requested = pyqtSignal()
+    select_all_requested = pyqtSignal()
 
     def __init__(self, scene: TopologyScene, parent=None):
         super().__init__(scene, parent)
@@ -663,8 +678,14 @@ class WorkspaceView(QGraphicsView):
             super().dragEnterEvent(event)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
-        if event.key() == Qt.Key_Delete:
+        if event.key() == Qt.Key_Delete or (
+            event.key() == Qt.Key_Backspace and event.modifiers() & (Qt.ControlModifier | Qt.MetaModifier)
+        ):
             self.delete_requested.emit()
+            event.accept()
+            return
+        if event.matches(QKeySequence.SelectAll):
+            self.select_all_requested.emit()
             event.accept()
             return
         if event.matches(QKeySequence.Copy):
@@ -699,12 +720,14 @@ class WorkspacePanel(QWidget):
     """Middle workspace area for topology editing."""
 
     topology_changed = pyqtSignal(int, int)
+    design_changed = pyqtSignal()
     node_parameter_updated = pyqtSignal(int, dict)
     analyzer_open_requested = pyqtSignal(int, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._clipboard_nodes: list[dict] = []
+        self._clipboard_edges: list[dict] = []
         self._setup_ui()
         self._setup_shortcuts()
 
@@ -722,12 +745,14 @@ class WorkspacePanel(QWidget):
 
         self.scene = TopologyScene(self)
         self.scene.topology_changed.connect(self.topology_changed.emit)
+        self.scene.design_changed.connect(self.design_changed.emit)
         self.scene.node_double_clicked.connect(self._edit_node_parameters)
 
         self.view = WorkspaceView(self.scene, self)
         self.view.delete_requested.connect(self.delete_selected)
         self.view.copy_requested.connect(self.copy_selected)
         self.view.paste_requested.connect(self.paste_selected)
+        self.view.select_all_requested.connect(self.select_all)
 
         layout.addWidget(title)
         layout.addWidget(hint)
@@ -737,6 +762,18 @@ class WorkspacePanel(QWidget):
         self._sc_delete = QShortcut(QKeySequence.Delete, self)
         self._sc_delete.setContext(Qt.WidgetWithChildrenShortcut)
         self._sc_delete.activated.connect(self.delete_selected)
+
+        self._sc_delete_ctrl_backspace = QShortcut(QKeySequence("Ctrl+Backspace"), self)
+        self._sc_delete_ctrl_backspace.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_delete_ctrl_backspace.activated.connect(self.delete_selected)
+
+        self._sc_delete_meta_backspace = QShortcut(QKeySequence("Meta+Backspace"), self)
+        self._sc_delete_meta_backspace.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_delete_meta_backspace.activated.connect(self.delete_selected)
+
+        self._sc_select_all = QShortcut(QKeySequence.SelectAll, self)
+        self._sc_select_all.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_select_all.activated.connect(self.select_all)
 
         self._sc_copy = QShortcut(QKeySequence.Copy, self)
         self._sc_copy.setContext(Qt.WidgetWithChildrenShortcut)
@@ -757,22 +794,32 @@ class WorkspacePanel(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             node.meta.params = dialog.get_params()
             self.node_parameter_updated.emit(node.node_id, node.meta.params)
+            self.design_changed.emit()
 
     def delete_selected(self) -> None:
         self.scene.delete_selected()
+
+    def select_all(self) -> None:
+        for item in self.scene.items():
+            if isinstance(item, (NodeItem, EdgeItem)):
+                item.setSelected(True)
 
     def copy_selected(self) -> None:
         nodes = self.scene.selected_nodes()
         if not nodes:
             self._clipboard_nodes = []
+            self._clipboard_edges = []
             return
 
         self._clipboard_nodes = []
+        self._clipboard_edges = []
         base = nodes[0].pos()
+        selected_ids = {node.node_id for node in nodes}
         for node in nodes:
             p = node.pos()
             self._clipboard_nodes.append(
                 {
+                    "id": node.node_id,
                     "name": node.meta.name,
                     "icon_path": node.meta.icon_path,
                     "params": node.meta.params or {},
@@ -780,6 +827,20 @@ class WorkspacePanel(QWidget):
                     "dy": p.y() - base.y(),
                 }
             )
+        for item in self.scene.items():
+            if not isinstance(item, EdgeItem):
+                continue
+            source_id = item.source.parent_node.node_id
+            target_id = item.target.parent_node.node_id
+            if source_id in selected_ids and target_id in selected_ids:
+                self._clipboard_edges.append(
+                    {
+                        "source_id": source_id,
+                        "source_side": item.source.side,
+                        "target_id": target_id,
+                        "target_side": item.target.side,
+                    }
+                )
 
     def paste_selected(self) -> None:
         if not self._clipboard_nodes:
@@ -789,11 +850,28 @@ class WorkspacePanel(QWidget):
             item.setSelected(False)
 
         center = self.view.mapToScene(self.view.viewport().rect().center())
+        id_map: dict[int, NodeItem] = {}
         for node_data in self._clipboard_nodes:
             pos = QPointF(center.x() + node_data["dx"] + 25, center.y() + node_data["dy"] + 25)
             node = self.scene.create_node(node_data["name"], node_data["icon_path"], pos)
             node.meta.params = self.scene._merge_with_default_params(node.meta.name, node_data.get("params", {}))
             node.setSelected(True)
+            if "id" in node_data:
+                id_map[int(node_data["id"])] = node
+
+        for edge_data in self._clipboard_edges:
+            src_node = id_map.get(int(edge_data["source_id"]))
+            tgt_node = id_map.get(int(edge_data["target_id"]))
+            if not src_node or not tgt_node:
+                continue
+            src_port = self.scene._get_port(src_node, edge_data.get("source_side", "right"))
+            tgt_port = self.scene._get_port(tgt_node, edge_data.get("target_side", "left"))
+            edge = EdgeItem(src_port, tgt_port)
+            self.scene.addItem(edge)
+            src_node.edges.append(edge)
+            tgt_node.edges.append(edge)
+            edge.setSelected(True)
+        self.scene._emit_counts()
 
     def zoom_in(self) -> None:
         self.view.scale(1.15, 1.15)
@@ -822,3 +900,4 @@ class WorkspacePanel(QWidget):
 
     def set_sweep_config(self, config: list[dict]) -> None:
         self.scene.sweep_config = list(config or [])
+        self.design_changed.emit()

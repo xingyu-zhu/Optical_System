@@ -39,28 +39,21 @@ COMPONENT_GROUPS = {
     ],
 }
 
-KEYWORD_ICON = [
-    ("txdsp", "Tx_DSP.png"),
-    ("rxdsp", "Rx_DSP.png"),
-    ("dac", "DAC.jpg"),
-    ("driver", "Driver.jpg"),
-    ("laser", "laser.png"),
-    ("lo", "LO.png"),
-    ("modulator", "modulator.jpg"),
-    ("fiber", "fiber.jpg"),
-    ("splitter", "splitter.jpg"),
-    ("combiner", "combiner.jpg"),
-    ("voa", "VOA.jpg"),
-    ("pol", "RotatePol.jpg"),
-    ("rotate", "RotatePol.jpg"),
-    ("oa", "OA.jpg"),
-    ("icr", "ICR.png"),
-    ("tia", "TIA.jpg"),
-    ("adc", "ADC.jpg"),
-    ("analyzer", "Analyzer.png"),
-    ("powermeter", "OPM.jpg"),
-    ("opm", "OPM.jpg"),
-]
+ICON_ALIASES = {
+    "coherentreceiver": "ICR.png",
+    "edfa": "OA.jpg",
+    "laser": "laser.png",
+    "opm": "OPM.jpg",
+    "polrot": "RotatePol.jpg",
+    "rotatepol": "RotatePol.jpg",
+    "rxdsp": "Rx_DSP.png",
+    "txdsp": "Tx_DSP.png",
+}
+
+LEGACY_CONTAINS_ALIASES = {
+    "rxdsp": "Rx_DSP.png",
+    "txdsp": "Tx_DSP.png",
+}
 
 
 def _first_existing(icon_name: str) -> str:
@@ -86,9 +79,6 @@ def _normalize(name: str) -> str:
 
 
 def resolve_icon_path(component_name: str, fallback: str = "") -> str:
-    if fallback and Path(fallback).exists():
-        return fallback
-
     key = component_name.lower()
     if key in _NAME_TO_ICON and _NAME_TO_ICON[key]:
         return _NAME_TO_ICON[key]
@@ -101,10 +91,19 @@ def resolve_icon_path(component_name: str, fallback: str = "") -> str:
         if _normalize(name_key) == norm:
             return path
 
-    for keyword, icon_name in KEYWORD_ICON:
+    alias_icon = ICON_ALIASES.get(norm)
+    if alias_icon:
+        path = _first_existing(alias_icon)
+        if path:
+            return path
+
+    for keyword, icon_name in LEGACY_CONTAINS_ALIASES.items():
         if keyword in norm:
             path = _first_existing(icon_name)
             if path:
                 return path
+
+    if fallback and Path(fallback).exists():
+        return fallback
 
     return fallback

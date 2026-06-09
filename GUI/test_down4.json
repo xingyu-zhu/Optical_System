@@ -1,11 +1,473 @@
 {
   "nodes": [
     {
+      "id": 55,
+      "name": "LO",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
+      "x": 1055.6439546875,
+      "y": 1195.4429328124995,
+      "params": {
+        "Power": [
+          "0",
+          "dBm",
+          "本振光功率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "本振线宽"
+        ],
+        "FreqOffset": [
+          "0.5",
+          "GHz",
+          "本振频偏"
+        ],
+        "Phase": [
+          "0",
+          "deg",
+          "初始相位"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 54,
+      "name": "ONURxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
+      "x": 1479.1431028124998,
+      "y": 1343.1419674999995,
+      "params": {
+        "Modulation": [
+          "16QAM",
+          "",
+          "调制格式"
+        ],
+        "CD_Compensation": [
+          "True",
+          "",
+          "色散补偿"
+        ],
+        "Adaptive_EQ": [
+          "True",
+          "",
+          "自适应均衡"
+        ]
+      }
+    },
+    {
+      "id": 53,
+      "name": "ADC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
+      "x": 1343.643954687499,
+      "y": 1342.6820015624996,
+      "params": {
+        "Bandwidth": [
+          "59",
+          "GHz",
+          "ADC 模拟带宽"
+        ],
+        "Resolution": [
+          "10",
+          "bit",
+          "量化位数"
+        ],
+        "SamplingRate": [
+          "256",
+          "GSa/s",
+          "采样率"
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1634.4247609374997,
+      "y": 1342.1800140624998,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "name": "ICR",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
+      "x": 1055.1419671874992,
+      "y": 1343.4429328124995,
+      "params": {
+        "Bandwidth": [
+          "25",
+          "GHz",
+          "接收机带宽"
+        ],
+        "Responsivity": [
+          "0.6",
+          "A/W",
+          "探测器响应度"
+        ],
+        "ThermalNoise": [
+          "True",
+          "",
+          "启用热噪声"
+        ],
+        "ShotNoise": [
+          "True",
+          "",
+          "启用散粒噪声"
+        ],
+        "DarkCurrent": [
+          "10",
+          "nA",
+          "暗电流"
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "name": "TIA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
+      "x": 1201.643954687499,
+      "y": 1342.4389578125,
+      "params": {
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "TIA 带宽"
+        ],
+        "Gain": [
+          "2000",
+          "Ohm",
+          "跨阻增益"
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "name": "LO",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
+      "x": 1049.6098831249994,
+      "y": 899.7734262499996,
+      "params": {
+        "Power": [
+          "0",
+          "dBm",
+          "本振光功率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "本振线宽"
+        ],
+        "FreqOffset": [
+          "0.5",
+          "GHz",
+          "本振频偏"
+        ],
+        "Phase": [
+          "0",
+          "deg",
+          "初始相位"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "name": "ONURxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
+      "x": 1473.1090312499998,
+      "y": 1047.4724609374994,
+      "params": {
+        "Modulation": [
+          "16QAM",
+          "",
+          "调制格式"
+        ],
+        "CD_Compensation": [
+          "True",
+          "",
+          "色散补偿"
+        ],
+        "Adaptive_EQ": [
+          "True",
+          "",
+          "自适应均衡"
+        ]
+      }
+    },
+    {
+      "id": 47,
+      "name": "ADC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
+      "x": 1337.6098831249994,
+      "y": 1047.0124949999995,
+      "params": {
+        "Bandwidth": [
+          "59",
+          "GHz",
+          "ADC 模拟带宽"
+        ],
+        "Resolution": [
+          "10",
+          "bit",
+          "量化位数"
+        ],
+        "SamplingRate": [
+          "256",
+          "GSa/s",
+          "采样率"
+        ]
+      }
+    },
+    {
+      "id": 46,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1628.3906893749997,
+      "y": 1046.5105074999997,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 45,
+      "name": "ICR",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
+      "x": 1049.1078956249996,
+      "y": 1047.7734262499994,
+      "params": {
+        "Bandwidth": [
+          "25",
+          "GHz",
+          "接收机带宽"
+        ],
+        "Responsivity": [
+          "0.6",
+          "A/W",
+          "探测器响应度"
+        ],
+        "ThermalNoise": [
+          "True",
+          "",
+          "启用热噪声"
+        ],
+        "ShotNoise": [
+          "True",
+          "",
+          "启用散粒噪声"
+        ],
+        "DarkCurrent": [
+          "10",
+          "nA",
+          "暗电流"
+        ]
+      }
+    },
+    {
+      "id": 44,
+      "name": "TIA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
+      "x": 1195.6098831249994,
+      "y": 1046.7694512499997,
+      "params": {
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "TIA 带宽"
+        ],
+        "Gain": [
+          "2000",
+          "Ohm",
+          "跨阻增益"
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "name": "LO",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
+      "x": 1051.6212403125003,
+      "y": 561.8654187499998,
+      "params": {
+        "Power": [
+          "0",
+          "dBm",
+          "本振光功率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "本振线宽"
+        ],
+        "FreqOffset": [
+          "0.5",
+          "GHz",
+          "本振频偏"
+        ],
+        "Phase": [
+          "0",
+          "deg",
+          "初始相位"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 42,
+      "name": "ONURxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
+      "x": 1475.1203884375002,
+      "y": 709.5644534374993,
+      "params": {
+        "Modulation": [
+          "16QAM",
+          "",
+          "调制格式"
+        ],
+        "CD_Compensation": [
+          "True",
+          "",
+          "色散补偿"
+        ],
+        "Adaptive_EQ": [
+          "True",
+          "",
+          "自适应均衡"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "name": "ADC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
+      "x": 1339.6212403124994,
+      "y": 709.1044874999999,
+      "params": {
+        "Bandwidth": [
+          "59",
+          "GHz",
+          "ADC 模拟带宽"
+        ],
+        "Resolution": [
+          "10",
+          "bit",
+          "量化位数"
+        ],
+        "SamplingRate": [
+          "256",
+          "GSa/s",
+          "采样率"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1630.4020465625001,
+      "y": 708.6024999999996,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "name": "ICR",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
+      "x": 1051.1192528124996,
+      "y": 709.8654187499998,
+      "params": {
+        "Bandwidth": [
+          "25",
+          "GHz",
+          "接收机带宽"
+        ],
+        "Responsivity": [
+          "0.6",
+          "A/W",
+          "探测器响应度"
+        ],
+        "ThermalNoise": [
+          "True",
+          "",
+          "启用热噪声"
+        ],
+        "ShotNoise": [
+          "True",
+          "",
+          "启用散粒噪声"
+        ],
+        "DarkCurrent": [
+          "10",
+          "nA",
+          "暗电流"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "name": "TIA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
+      "x": 1197.6212403124994,
+      "y": 708.8614437499997,
+      "params": {
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "TIA 带宽"
+        ],
+        "Gain": [
+          "2000",
+          "Ohm",
+          "跨阻增益"
+        ]
+      }
+    },
+    {
       "id": 37,
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 182.73180048437496,
-      "y": 730.9272019374997,
+      "x": -77.87013076562488,
+      "y": 830.6205581874997,
       "params": {
         "Enabled": [
           "True",
@@ -23,8 +485,8 @@
       "id": 32,
       "name": "Splitter",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/splitter.jpg",
-      "x": 832.7018756249996,
-      "y": 1057.9738806249993,
+      "x": 722.5144818749995,
+      "y": 820.1090306249994,
       "params": {
         "Enabled": [
           "True",
@@ -35,468 +497,6 @@
           "",
           "",
           "备注"
-        ]
-      }
-    },
-    {
-      "id": 31,
-      "name": "ICR",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1194.4503149999996,
-      "y": 1366.529815312499,
-      "params": {
-        "Bandwidth": [
-          "25",
-          "GHz",
-          "接收机带宽"
-        ],
-        "Responsivity": [
-          "0.6",
-          "A/W",
-          "探测器响应度"
-        ],
-        "ThermalNoise": [
-          "True",
-          "",
-          "启用热噪声"
-        ],
-        "ShotNoise": [
-          "True",
-          "",
-          "启用散粒噪声"
-        ],
-        "DarkCurrent": [
-          "10",
-          "nA",
-          "暗电流"
-        ]
-      }
-    },
-    {
-      "id": 30,
-      "name": "E-Analyzer",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1831.4503149999996,
-      "y": 1342.529815312499,
-      "params": {
-        "Enabled": [
-          "True",
-          "",
-          "是否启用"
-        ],
-        "Comment": [
-          "",
-          "",
-          "备注"
-        ]
-      }
-    },
-    {
-      "id": 29,
-      "name": "ADC",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 1486.4503149999996,
-      "y": 1346.529815312499,
-      "params": {
-        "Bandwidth": [
-          "59",
-          "GHz",
-          "ADC 模拟带宽"
-        ],
-        "Resolution": [
-          "10",
-          "bit",
-          "量化位数"
-        ],
-        "SamplingRate": [
-          "256",
-          "GSa/s",
-          "采样率"
-        ]
-      }
-    },
-    {
-      "id": 28,
-      "name": "ONURxDSP",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 1620.2004568749994,
-      "y": 1336.4957437499993,
-      "params": {
-        "Modulation": [
-          "16QAM",
-          "",
-          "调制格式"
-        ],
-        "CD_Compensation": [
-          "True",
-          "",
-          "色散补偿"
-        ],
-        "Adaptive_EQ": [
-          "True",
-          "",
-          "自适应均衡"
-        ]
-      }
-    },
-    {
-      "id": 27,
-      "name": "LO",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1198.4503149999996,
-      "y": 1218.529815312499,
-      "params": {
-        "Power": [
-          "8",
-          "dBm",
-          "本振光功率"
-        ],
-        "Linewidth": [
-          "100",
-          "kHz",
-          "本振线宽"
-        ],
-        "FreqOffset": [
-          "0.5",
-          "GHz",
-          "本振频偏"
-        ],
-        "Phase": [
-          "0",
-          "deg",
-          "初始相位"
-        ],
-        "RIN": [
-          "-150",
-          "dB/Hz",
-          "相对强度噪声"
-        ]
-      }
-    },
-    {
-      "id": 26,
-      "name": "TIA",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 1344.4503149999996,
-      "y": 1358.529815312499,
-      "params": {
-        "Bandwidth": [
-          "35",
-          "GHz",
-          "TIA 带宽"
-        ],
-        "Gain": [
-          "2000",
-          "Ohm",
-          "跨阻增益"
-        ]
-      }
-    },
-    {
-      "id": 25,
-      "name": "ICR",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1198.473029374999,
-      "y": 411.13515124999975,
-      "params": {
-        "Bandwidth": [
-          "25",
-          "GHz",
-          "接收机带宽"
-        ],
-        "Responsivity": [
-          "0.6",
-          "A/W",
-          "探测器响应度"
-        ],
-        "ThermalNoise": [
-          "True",
-          "",
-          "启用热噪声"
-        ],
-        "ShotNoise": [
-          "True",
-          "",
-          "启用散粒噪声"
-        ],
-        "DarkCurrent": [
-          "10",
-          "nA",
-          "暗电流"
-        ]
-      }
-    },
-    {
-      "id": 24,
-      "name": "E-Analyzer",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1835.473029374999,
-      "y": 387.13515124999975,
-      "params": {
-        "Enabled": [
-          "True",
-          "",
-          "是否启用"
-        ],
-        "Comment": [
-          "",
-          "",
-          "备注"
-        ]
-      }
-    },
-    {
-      "id": 23,
-      "name": "ADC",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 1490.473029374999,
-      "y": 391.13515124999975,
-      "params": {
-        "Bandwidth": [
-          "59",
-          "GHz",
-          "ADC 模拟带宽"
-        ],
-        "Resolution": [
-          "10",
-          "bit",
-          "量化位数"
-        ],
-        "SamplingRate": [
-          "256",
-          "GSa/s",
-          "采样率"
-        ]
-      }
-    },
-    {
-      "id": 22,
-      "name": "ONURxDSP",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 1624.2231712499997,
-      "y": 381.1010796874995,
-      "params": {
-        "Modulation": [
-          "16QAM",
-          "",
-          "调制格式"
-        ],
-        "CD_Compensation": [
-          "True",
-          "",
-          "色散补偿"
-        ],
-        "Adaptive_EQ": [
-          "True",
-          "",
-          "自适应均衡"
-        ]
-      }
-    },
-    {
-      "id": 21,
-      "name": "LO",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1202.473029374999,
-      "y": 263.13515124999975,
-      "params": {
-        "Power": [
-          "13",
-          "dBm",
-          "本振光功率"
-        ],
-        "Linewidth": [
-          "100",
-          "kHz",
-          "本振线宽"
-        ],
-        "FreqOffset": [
-          "0.5",
-          "GHz",
-          "本振频偏"
-        ],
-        "Phase": [
-          "0",
-          "deg",
-          "初始相位"
-        ],
-        "RIN": [
-          "-150",
-          "dB/Hz",
-          "相对强度噪声"
-        ]
-      }
-    },
-    {
-      "id": 20,
-      "name": "TIA",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 1348.473029374999,
-      "y": 403.13515124999975,
-      "params": {
-        "Bandwidth": [
-          "35",
-          "GHz",
-          "TIA 带宽"
-        ],
-        "Gain": [
-          "2000",
-          "Ohm",
-          "跨阻增益"
-        ]
-      }
-    },
-    {
-      "id": 19,
-      "name": "ICR",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1188.4162434374991,
-      "y": 1052.7580940624996,
-      "params": {
-        "Bandwidth": [
-          "25",
-          "GHz",
-          "接收机带宽"
-        ],
-        "Responsivity": [
-          "0.6",
-          "A/W",
-          "探测器响应度"
-        ],
-        "ThermalNoise": [
-          "True",
-          "",
-          "启用热噪声"
-        ],
-        "ShotNoise": [
-          "True",
-          "",
-          "启用散粒噪声"
-        ],
-        "DarkCurrent": [
-          "10",
-          "nA",
-          "暗电流"
-        ]
-      }
-    },
-    {
-      "id": 18,
-      "name": "E-Analyzer",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1825.4162434374991,
-      "y": 1028.7580940624996,
-      "params": {
-        "Enabled": [
-          "True",
-          "",
-          "是否启用"
-        ],
-        "Comment": [
-          "",
-          "",
-          "备注"
-        ]
-      }
-    },
-    {
-      "id": 17,
-      "name": "ADC",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 1480.4162434374991,
-      "y": 1032.7580940624996,
-      "params": {
-        "Bandwidth": [
-          "59",
-          "GHz",
-          "ADC 模拟带宽"
-        ],
-        "Resolution": [
-          "10",
-          "bit",
-          "量化位数"
-        ],
-        "SamplingRate": [
-          "256",
-          "GSa/s",
-          "采样率"
-        ]
-      }
-    },
-    {
-      "id": 16,
-      "name": "ONURxDSP",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 1614.1663853124994,
-      "y": 1022.7240224999994,
-      "params": {
-        "Modulation": [
-          "16QAM",
-          "",
-          "调制格式"
-        ],
-        "CD_Compensation": [
-          "True",
-          "",
-          "色散补偿"
-        ],
-        "Adaptive_EQ": [
-          "True",
-          "",
-          "自适应均衡"
-        ]
-      }
-    },
-    {
-      "id": 15,
-      "name": "LO",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1192.4162434374991,
-      "y": 904.7580940624996,
-      "params": {
-        "Power": [
-          "5",
-          "dBm",
-          "本振光功率"
-        ],
-        "Linewidth": [
-          "100",
-          "kHz",
-          "本振线宽"
-        ],
-        "FreqOffset": [
-          "0.5",
-          "GHz",
-          "本振频偏"
-        ],
-        "Phase": [
-          "0",
-          "deg",
-          "初始相位"
-        ],
-        "RIN": [
-          "-150",
-          "dB/Hz",
-          "相对强度噪声"
-        ]
-      }
-    },
-    {
-      "id": 14,
-      "name": "TIA",
-      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 1338.4162434374991,
-      "y": 1044.7580940624996,
-      "params": {
-        "Bandwidth": [
-          "35",
-          "GHz",
-          "TIA 带宽"
-        ],
-        "Gain": [
-          "2000",
-          "Ohm",
-          "跨阻增益"
         ]
       }
     },
@@ -504,8 +504,8 @@
       "id": 1,
       "name": "OLTTxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
-      "x": 42.54855000000043,
-      "y": 884.8750709374999,
+      "x": -76.38387499999953,
+      "y": 657.5042584374999,
       "params": {
         "TransmitFrequency": [
           "193.1",
@@ -538,8 +538,8 @@
       "id": 2,
       "name": "DAC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
-      "x": 216.54855000000043,
-      "y": 886.8750709374999,
+      "x": 97.61612500000052,
+      "y": 657.7552521874998,
       "params": {
         "ElectricalBandwidth": [
           "32",
@@ -557,8 +557,8 @@
       "id": 3,
       "name": "Driver",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
-      "x": 376.54855000000043,
-      "y": 889.8750709374999,
+      "x": 257.6161250000005,
+      "y": 657.2572396874998,
       "params": {
         "Gain": [
           "2",
@@ -576,8 +576,8 @@
       "id": 4,
       "name": "LaserCW",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
-      "x": 204.54855000000043,
-      "y": 1050.8750709375,
+      "x": 104.85519375000052,
+      "y": 823.5042584375001,
       "params": {
         "Power": [
           "13",
@@ -605,8 +605,8 @@
       "id": 5,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 364.54855000000043,
-      "y": 1054.8750709375,
+      "x": 259.6081750000005,
+      "y": 822.2572396874998,
       "params": {
         "Vpi": [
           "3",
@@ -624,8 +624,8 @@
       "id": 6,
       "name": "Fiber",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/fiber.jpg",
-      "x": 560.5485500000004,
-      "y": 1057.8750709375,
+      "x": 436.36910625000036,
+      "y": 820.0102209375,
       "params": {
         "Length": [
           "20",
@@ -653,8 +653,8 @@
       "id": 7,
       "name": "OA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
-      "x": 702.5485500000004,
-      "y": 1058.8750709375,
+      "x": 581.8671187500004,
+      "y": 821.0102209375,
       "params": {
         "OutputPower": [
           "0",
@@ -672,8 +672,8 @@
       "id": 8,
       "name": "ICR",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1215.3997715625005,
-      "y": 779.3645650000003,
+      "x": 1049.2441778125005,
+      "y": 398.08120250000036,
       "params": {
         "Bandwidth": [
           "25",
@@ -706,8 +706,8 @@
       "id": 9,
       "name": "TIA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 1365.3997715625005,
-      "y": 771.3645650000003,
+      "x": 1195.7461653125004,
+      "y": 397.07722750000045,
       "params": {
         "Bandwidth": [
           "35",
@@ -725,8 +725,8 @@
       "id": 10,
       "name": "ADC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 1507.3997715625005,
-      "y": 759.3645650000003,
+      "x": 1337.7461653125001,
+      "y": 397.3202712500004,
       "params": {
         "Bandwidth": [
           "59",
@@ -749,8 +749,8 @@
       "id": 11,
       "name": "ONURxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 1641.1499134375008,
-      "y": 749.3304934375001,
+      "x": 1473.2453134375007,
+      "y": 397.7802371875001,
       "params": {
         "Modulation": [
           "16QAM",
@@ -773,8 +773,8 @@
       "id": 12,
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1852.3997715625005,
-      "y": 755.3645650000003,
+      "x": 1628.5269715625006,
+      "y": 396.8182837500004,
       "params": {
         "Enabled": [
           "True",
@@ -792,8 +792,8 @@
       "id": 13,
       "name": "LO",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1219.3997715625005,
-      "y": 631.3645650000003,
+      "x": 1049.7461653125006,
+      "y": 250.08120250000036,
       "params": {
         "Power": [
           "0",
@@ -826,8 +826,8 @@
       "id": 36,
       "name": "O-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 805.9860237820307,
-      "y": 1244.8893040593744,
+      "x": 582.1132237820307,
+      "y": 986.0363790593747,
       "params": {
         "Enabled": [
           "True",
@@ -844,117 +844,111 @@
   ],
   "edges": [
     {
-      "source_id": 1,
-      "source_side": "right",
-      "target_id": 37,
-      "target_side": "left"
-    },
-    {
-      "source_id": 28,
-      "source_side": "right",
-      "target_id": 30,
-      "target_side": "left"
-    },
-    {
-      "source_id": 29,
-      "source_side": "right",
-      "target_id": 28,
-      "target_side": "left"
-    },
-    {
-      "source_id": 26,
-      "source_side": "right",
-      "target_id": 29,
-      "target_side": "left"
-    },
-    {
-      "source_id": 31,
-      "source_side": "right",
-      "target_id": 26,
-      "target_side": "left"
-    },
-    {
-      "source_id": 16,
-      "source_side": "right",
-      "target_id": 18,
-      "target_side": "left"
-    },
-    {
-      "source_id": 17,
-      "source_side": "right",
-      "target_id": 16,
-      "target_side": "left"
-    },
-    {
-      "source_id": 14,
-      "source_side": "right",
-      "target_id": 17,
-      "target_side": "left"
-    },
-    {
-      "source_id": 27,
-      "source_side": "bottom",
-      "target_id": 31,
-      "target_side": "top"
-    },
-    {
-      "source_id": 19,
-      "source_side": "right",
-      "target_id": 14,
-      "target_side": "left"
-    },
-    {
-      "source_id": 15,
-      "source_side": "bottom",
-      "target_id": 19,
-      "target_side": "top"
-    },
-    {
-      "source_id": 22,
-      "source_side": "right",
-      "target_id": 24,
-      "target_side": "left"
-    },
-    {
-      "source_id": 23,
-      "source_side": "right",
-      "target_id": 22,
-      "target_side": "left"
-    },
-    {
-      "source_id": 20,
-      "source_side": "right",
-      "target_id": 23,
-      "target_side": "left"
-    },
-    {
-      "source_id": 25,
-      "source_side": "right",
-      "target_id": 20,
-      "target_side": "left"
-    },
-    {
-      "source_id": 21,
-      "source_side": "bottom",
-      "target_id": 25,
-      "target_side": "top"
-    },
-    {
       "source_id": 32,
       "source_side": "right",
-      "target_id": 25,
+      "target_id": 51,
       "target_side": "left"
     },
     {
       "source_id": 32,
       "source_side": "right",
-      "target_id": 31,
+      "target_id": 45,
       "target_side": "left"
     },
     {
       "source_id": 32,
       "source_side": "right",
-      "target_id": 19,
+      "target_id": 39,
+      "target_side": "left"
+    },
+    {
+      "source_id": 55,
+      "source_side": "bottom",
+      "target_id": 51,
+      "target_side": "top"
+    },
+    {
+      "source_id": 54,
+      "source_side": "right",
+      "target_id": 52,
+      "target_side": "left"
+    },
+    {
+      "source_id": 53,
+      "source_side": "right",
+      "target_id": 54,
+      "target_side": "left"
+    },
+    {
+      "source_id": 50,
+      "source_side": "right",
+      "target_id": 53,
+      "target_side": "left"
+    },
+    {
+      "source_id": 51,
+      "source_side": "right",
+      "target_id": 50,
+      "target_side": "left"
+    },
+    {
+      "source_id": 49,
+      "source_side": "bottom",
+      "target_id": 45,
+      "target_side": "top"
+    },
+    {
+      "source_id": 48,
+      "source_side": "right",
+      "target_id": 46,
+      "target_side": "left"
+    },
+    {
+      "source_id": 47,
+      "source_side": "right",
+      "target_id": 48,
+      "target_side": "left"
+    },
+    {
+      "source_id": 44,
+      "source_side": "right",
+      "target_id": 47,
+      "target_side": "left"
+    },
+    {
+      "source_id": 45,
+      "source_side": "right",
+      "target_id": 44,
+      "target_side": "left"
+    },
+    {
+      "source_id": 43,
+      "source_side": "bottom",
+      "target_id": 39,
+      "target_side": "top"
+    },
+    {
+      "source_id": 42,
+      "source_side": "right",
+      "target_id": 40,
+      "target_side": "left"
+    },
+    {
+      "source_id": 41,
+      "source_side": "right",
+      "target_id": 42,
+      "target_side": "left"
+    },
+    {
+      "source_id": 38,
+      "source_side": "right",
+      "target_id": 41,
+      "target_side": "left"
+    },
+    {
+      "source_id": 39,
+      "source_side": "right",
+      "target_id": 38,
       "target_side": "left"
     },
     {
@@ -1036,8 +1030,14 @@
       "target_side": "top"
     },
     {
+      "source_id": 1,
+      "source_side": "bottom",
+      "target_id": 37,
+      "target_side": "top"
+    },
+    {
       "source_id": 7,
-      "source_side": "right",
+      "source_side": "bottom",
       "target_id": 36,
       "target_side": "top"
     }

@@ -63,7 +63,7 @@ def draw_range(ax, values, y, marker_face, marker_edge, marker_width, fmt, label
     ax.scatter(
         [left, right],
         [y, y],
-        s=160,
+        s=220,
         facecolors=marker_face,
         edgecolors=marker_edge,
         linewidths=marker_width * 2,
@@ -91,10 +91,10 @@ def draw_panel(ax, panel):
     draw_range(ax, panel["csh_range"], y, "white", C_CSH_EDGE, 1.6, fmt, label_offset=0.034)
     draw_range(ax, panel["carbonate_range"], y, C_CARB, C_CARB, 1.0, fmt, label_offset=0.034)
 
-    # Left-side title (inside axes, near left edge)
+    # Left-side title aligned with the first x tick.
     ax.text(
-        x0 + 0.01 * xr,
-        0.165,
+        x0,
+        0.34,
         panel["title"],
         ha="left",
         va="bottom",
@@ -105,7 +105,7 @@ def draw_panel(ax, panel):
 
     # Axes style
     ax.set_xlim(x0, x1)
-    ax.set_ylim(-0.15, 0.20)  # room for numeric labels and titles
+    ax.set_ylim(-0.15, 0.40)  # room for numeric labels and titles
     ax.set_yticks([])
 
     # Remove y-axis completely
@@ -126,8 +126,8 @@ def main():
     # Compact overall figure height for 4 rows
     fig, axes = plt.subplots(
         4, 1,
-        figsize=(13.2, 12.0),
-        gridspec_kw={"hspace": 0.78}
+        figsize=(13.2, 14.2),
+        gridspec_kw={"hspace": 1.3}
     )
 
     for ax, panel in zip(axes, PANELS):
@@ -165,7 +165,7 @@ def main():
         prop={"weight": "bold", "size": 24},
     )
 
-    fig.subplots_adjust(left=0.055, right=0.995, top=0.965, bottom=0.22, hspace=0.78)
+    fig.subplots_adjust(left=0.055, right=0.995, top=0.965, bottom=0.18, hspace=1.3)
     fig.savefig("hydration_carbonation_dumbbell.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
     print("Saved: hydration_carbonation_dumbbell.pdf")
