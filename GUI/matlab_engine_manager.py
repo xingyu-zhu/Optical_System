@@ -48,7 +48,7 @@ class MatlabEngineManager:
                 import matlab.engine
             except Exception as exc:
                 raise RuntimeError(
-                    self._engine_import_error_message()
+                    self._engine_import_error_message(exc)
                 ) from exc
 
             if connect_existing:
@@ -77,7 +77,9 @@ class MatlabEngineManager:
         active Python environment. This fallback helps local/packaged runs find
         the engine when MATLAB is installed but the package is not on sys.path.
         """
-        candidates = self._matlab_engine_path_candidates()
+        roots = self._matlab_root_candidates()
+        self._configure_windows_runtime_paths(roots)
+        candidates = self._matlab_engine_path_candidates_for_roots(roots)
         for path in candidates:
             if path.exists():
                 text = str(path)
@@ -86,7 +88,9 @@ class MatlabEngineManager:
                 return
 
     def _matlab_engine_path_candidates(self) -> list[Path]:
-        roots = self._matlab_root_candidates()
+        return self._matlab_engine_path_candidates_for_roots(self._matlab_root_candidates())
+
+    def _matlab_engine_path_candidates_for_roots(self, roots: list[Path]) -> list[Path]:
         paths: list[Path] = []
         for root in roots:
             engine_dir = root / "extern" / "engines" / "python"
@@ -235,17 +239,47 @@ class MatlabEngineManager:
             unique.append(path)
         return unique
 
-    def _engine_import_error_message(self) -> str:
+    def _configure_windows_runtime_paths(self, roots: list[Path]) -> None:
+        if platform.system().lower() != "windows":
+            return
+
+        runtime_dirs: list[Path] = []
+        for root in roots:
+            runtime_dirs.extend(
+                [
+                    root / "bin" / "win64",
+                    root / "extern" / "bin" / "win64",
+                    root / "runtime" / "win64",
+                ]
+            )
+
+        path_parts = os.environ.get("PATH", "").split(os.pathsep)
+        for runtime_dir in runtime_dirs:
+            if not runtime_dir.exists():
+                continue
+            text = str(runtime_dir)
+            if hasattr(os, "add_dll_directory"):
+                try:
+                    os.add_dll_directory(text)
+                except Exception:
+                    pass
+            if text not in path_parts:
+                path_parts.insert(0, text)
+        os.environ["PATH"] = os.pathsep.join(path_parts)
+
+    def _engine_import_error_message(self, original_error: Exception | None = None) -> str:
         roots = self._matlab_root_candidates()
         candidates = self._matlab_engine_path_candidates()
         existing = [str(path) for path in candidates if path.exists()]
         root_text = ", ".join(str(root) for root in roots) if roots else "未检测到 MATLAB 安装目录"
         path_text = ", ".join(existing) if existing else "未检测到可用的 MATLAB Engine Python 路径"
+        detail = f"\n原始错误: {type(original_error).__name__}: {original_error}" if original_error else ""
         return (
             "Unable to import matlab.engine. 请先安装与当前 Python 版本兼容的 MATLAB Engine for Python。\n"
             f"检测到的 MATLAB 根目录: {root_text}\n"
             f"检测到的 Engine 路径: {path_text}\n"
             "安装方式示例: cd <MATLABROOT>/extern/engines/python && python -m pip install ."
+            f"{detail}"
         )
 
     def _configure_project_paths(self) -> None:
