@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import platform
 import sys
@@ -74,14 +75,35 @@ class MatlabEngineManager:
             return self._engine
 
     def _configure_engine_python_path(self) -> None:
-        """Add MATLAB Engine package paths across macOS, Windows, and Linux.
+        """Configure MATLAB runtime paths across macOS, Windows, and Linux.
 
-        The preferred deployment path is still installing MATLAB Engine into the
-        active Python environment. This fallback helps local/packaged runs find
-        the engine when MATLAB is installed but the package is not on sys.path.
+        MATLAB Engine must be installed into the active Python environment and
+        bundled by PyInstaller.  Adding MATLAB's own
+        ``extern/engines/python/dist`` directory to ``sys.path`` is fragile in a
+        frozen exe and can trigger ``unable to read _arch.txt`` on Windows.
+        Therefore this method only prepares MATLAB runtime/DLL locations.
         """
         roots = self._matlab_root_candidates()
         self._configure_windows_runtime_paths(roots)
+        self._configure_direct_engine_import_path_for_development(roots)
+
+    def _configure_direct_engine_import_path_for_development(self, roots: list[Path]) -> None:
+        """Optionally allow direct MATLAB Engine source imports for developers.
+
+        Normal users and packaged builds should not use this path.  It is kept
+        behind an opt-in environment variable for local diagnostics only.
+        """
+        if os.environ.get("OPTICAL_GUI_ALLOW_DIRECT_MATLAB_ENGINE_IMPORT") != "1":
+            return
+        if getattr(sys, "frozen", False):
+            return
+        try:
+            engine_spec = importlib.util.find_spec("matlab.engine")
+        except (ImportError, AttributeError, ValueError):
+            engine_spec = None
+        if engine_spec is not None:
+            return
+
         candidates = self._matlab_engine_path_candidates_for_roots(roots)
         for path in candidates:
             if path.exists() and self._engine_python_path_is_usable(path):
@@ -303,11 +325,20 @@ class MatlabEngineManager:
         path_text = ", ".join(existing) if existing else "未检测到可用的 MATLAB Engine Python 路径"
         detail = f"\n原始错误: {type(original_error).__name__}: {original_error}" if original_error else ""
         first_detail = f"\n首次导入错误: {type(first_error).__name__}: {first_error}" if first_error else ""
+        python_text = sys.executable
+        frozen_note = (
+            "\n当前程序是打包后的 exe。请在打包用的 Python 环境中先安装 MATLAB Engine，"
+            "然后重新运行 PyInstaller；运行时选择 MATLAB 安装目录不能替代安装 matlab.engine。"
+            if getattr(sys, "frozen", False)
+            else ""
+        )
         return (
             "Unable to import matlab.engine. 请先安装与当前 Python 版本兼容的 MATLAB Engine for Python。\n"
+            f"当前 Python: {python_text}\n"
             f"检测到的 MATLAB 根目录: {root_text}\n"
             f"检测到的 Engine 路径: {path_text}\n"
             "安装方式示例: cd <MATLABROOT>/extern/engines/python && python -m pip install ."
+            f"{frozen_note}"
             f"{first_detail}"
             f"{detail}"
         )
