@@ -4,8 +4,8 @@
       "id": 30,
       "name": "O-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 1686.6760397656233,
-      "y": 1375.0031260156245,
+      "x": 1788.425756250294,
+      "y": 1380.2334544375983,
       "params": {
         "Enabled": [
           "True",
@@ -23,8 +23,8 @@
       "id": 29,
       "name": "Combiner",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/combiner.jpg",
-      "x": 1683.4017040937501,
-      "y": 1178.679784421875,
+      "x": 1790.648620229532,
+      "y": 1176.4857192770992,
       "params": {
         "Enabled": [
           "True",
@@ -551,8 +551,8 @@
       "id": 7,
       "name": "OA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
-      "x": 1837.5688218250893,
-      "y": 1178.0800510173938,
+      "x": 683.46839404384,
+      "y": 724.4713337830192,
       "params": {
         "Mode": [
           "OutputPower",
@@ -739,11 +739,11 @@
       "id": 31,
       "name": "VOA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/VOA.jpg",
-      "x": 2205.156480908593,
-      "y": 1175.7287871671865,
+      "x": 2199.038435183515,
+      "y": 1181.8468328922647,
       "params": {
         "Mode": [
-          "Attenuation",
+          "OutputPower",
           "",
           "工作模式"
         ],
@@ -758,21 +758,115 @@
           "衰减量"
         ]
       }
+    },
+    {
+      "id": 32,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 691.1615004999999,
+      "y": 1045.0597976406243,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 705.0398650937498,
+      "y": 1336.5054541093743,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 718.9182296874995,
+      "y": 1671.8992651249982,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 2436.5782105093726,
+      "y": 1353.9501191585928,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
     }
   ],
   "edges": [
-    {
-      "source_id": 28,
-      "source_side": "right",
-      "target_id": 29,
-      "target_side": "left"
-    },
-    {
-      "source_id": 23,
-      "source_side": "right",
-      "target_id": 29,
-      "target_side": "left"
-    },
     {
       "source_id": 25,
       "source_side": "right",
@@ -846,18 +940,6 @@
       "target_side": "left"
     },
     {
-      "source_id": 18,
-      "source_side": "right",
-      "target_id": 29,
-      "target_side": "left"
-    },
-    {
-      "source_id": 4,
-      "source_side": "right",
-      "target_id": 29,
-      "target_side": "left"
-    },
-    {
       "source_id": 1,
       "source_side": "right",
       "target_id": 2,
@@ -918,18 +1000,6 @@
       "target_side": "top"
     },
     {
-      "source_id": 29,
-      "source_side": "right",
-      "target_id": 7,
-      "target_side": "left"
-    },
-    {
-      "source_id": 7,
-      "source_side": "right",
-      "target_id": 6,
-      "target_side": "left"
-    },
-    {
       "source_id": 6,
       "source_side": "right",
       "target_id": 31,
@@ -940,19 +1010,123 @@
       "source_side": "right",
       "target_id": 8,
       "target_side": "left"
+    },
+    {
+      "source_id": 29,
+      "source_side": "right",
+      "target_id": 6,
+      "target_side": "left"
+    },
+    {
+      "source_id": 28,
+      "source_side": "right",
+      "target_id": 34,
+      "target_side": "left"
+    },
+    {
+      "source_id": 34,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 23,
+      "source_side": "right",
+      "target_id": 33,
+      "target_side": "left"
+    },
+    {
+      "source_id": 33,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 18,
+      "source_side": "right",
+      "target_id": 32,
+      "target_side": "left"
+    },
+    {
+      "source_id": 32,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 4,
+      "source_side": "right",
+      "target_id": 7,
+      "target_side": "left"
+    },
+    {
+      "source_id": 7,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 8,
+      "source_side": "bottom",
+      "target_id": 35,
+      "target_side": "top"
     }
   ],
   "parameter_sweeps": [
     {
       "enabled": false,
       "depth": 1,
-      "node_id": 1,
-      "component": "ONUTxDSP",
-      "parameter": "TransmitFrequency",
-      "start": "",
-      "stop": "",
+      "node_id": 7,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
       "step": "1",
-      "unit": "THz"
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 32,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 33,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 34,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 2,
+      "node_id": 31,
+      "component": "VOA",
+      "parameter": "OutputPower",
+      "start": "-35",
+      "stop": "-30",
+      "step": "1",
+      "unit": "dBm"
     }
   ]
 }

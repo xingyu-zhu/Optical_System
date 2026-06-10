@@ -307,7 +307,8 @@ class SimulationResultDialog(QDialog):
             y = [max(float(item["BER"]), 1e-12) for item in group]
             if x and y:
                 tx_label = f", Tx={scalar_text(tx_power)} dBm" if tx_power is not None else ""
-                ax2.scatter(x, y, s=38, alpha=0.85, label=f"{component}{tx_label}")
+                line = ax2.plot(x, y, linewidth=1.4, alpha=0.7, label=f"{component}{tx_label}")[0]
+                ax2.scatter(x, y, s=38, alpha=0.9, color=line.get_color())
                 plotted = True
         if plotted:
             ax2.set_yscale("log")
@@ -334,11 +335,13 @@ class SimulationResultDialog(QDialog):
 
         plotted = False
         for component, group in sorted(grouped.items()):
+            group = sorted(group, key=lambda item: float(item["tx_power_dbm"]))
             x = [float(item["tx_power_dbm"]) for item in group]
             y = [float(item[y_key]) for item in group]
             if not x or not y:
                 continue
-            ax.scatter(x, y, s=48, alpha=0.85, label=component)
+            line = ax.plot(x, y, linewidth=1.4, alpha=0.7, label=component)[0]
+            ax.scatter(x, y, s=48, alpha=0.9, color=line.get_color())
             plotted = True
 
         if plotted:

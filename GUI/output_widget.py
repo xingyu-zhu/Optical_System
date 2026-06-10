@@ -7,7 +7,7 @@ from typing import Optional
 
 from PyQt5.QtCore import QThread, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QFontDatabase, QTextCharFormat, QTextCursor
-from PyQt5.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from matlab_engine_manager import MatlabEngineManager
 
@@ -70,6 +70,7 @@ class OutputWidget(QWidget):
         self.engine_manager = engine_manager or MatlabEngineManager()
         self._connect_worker = None
         self._disconnect_worker = None
+        self._retry_connect_after_worker_finished = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -143,13 +144,14 @@ class OutputWidget(QWidget):
 
         self.engine_status_changed.emit("Starting")
         self.connect_btn.setEnabled(False)
+        self.disconnect_btn.setEnabled(False)
         self.append_matlab("正在连接 MATLAB 引擎...")
 
         worker = MatlabConnectWorker(self.engine_manager)
         self._connect_worker = worker
         worker.connected.connect(self._on_connect_success)
         worker.failed.connect(self._on_connect_failed)
-        worker.finished.connect(lambda: self.connect_btn.setEnabled(True))
+        worker.finished.connect(self._on_connect_worker_finished)
         worker.start()
 
     def disconnect_matlab(self) -> None:
@@ -180,6 +182,40 @@ class OutputWidget(QWidget):
     def _on_connect_failed(self, error_text: str) -> None:
         self.append_message(f"Failed to connect MATLAB: {error_text}", source="ERROR")
         self.engine_status_changed.emit("Error")
+        self._prompt_for_matlab_path_and_retry()
+
+    def _prompt_for_matlab_path_and_retry(self) -> None:
+        reply = QMessageBox.question(
+            self,
+            "选择 MATLAB 路径",
+            "无法连接 MATLAB 引擎。\n\n是否手动选择 MATLAB 安装目录或 MATLAB Engine Python 目录后重试？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "选择 MATLAB 安装目录或 extern/engines/python 目录",
+            "",
+        )
+        if not selected:
+            return
+
+        try:
+            root = self.engine_manager.set_matlab_root(selected, persist=True)
+            self.append_message(f"MATLAB path configured: {root}", source="INFO")
+            self._retry_connect_after_worker_finished = True
+        except Exception as exc:
+            QMessageBox.warning(self, "MATLAB 路径无效", str(exc))
+
+    def _on_connect_worker_finished(self) -> None:
+        self.connect_btn.setEnabled(True)
+        self.disconnect_btn.setEnabled(self.engine_manager.is_running())
+        if self._retry_connect_after_worker_finished:
+            self._retry_connect_after_worker_finished = False
+            self.connect_matlab()
 
     def _on_disconnect_success(self) -> None:
         self.append_matlab("MATLAB 引擎已断开。")

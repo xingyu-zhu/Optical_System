@@ -641,7 +641,7 @@ function Params = buildDefaultParams(guiParams, context)
     Params.Opt.Obj.LO.FreqOffset = ghzParam(guiParams, {'FreqOffset', 'LO_FreqOffset'}, Params.deltafs);
     Params.Opt.Obj.LO.Phase = getParam(guiParams, 'Phase', 0);
     Params.Opt.Obj.Splitter.N = max(1, round(Params.num_bands));
-    Params.Guard_Time = getParamAny(guiParams, {'GuardTime', 'Guard_Time'}, 2e-6);
+    Params.Guard_Time = getParamAny(guiParams, {'GuardTime', 'Guard_Time'}, 45e-9);
     rawTargetONU = getParamAny(guiParams, {'TargetONU', 'Target_ONU'}, []);
     if isempty(rawTargetONU) || (ischar(rawTargetONU) && strcmpi(strtrim(rawTargetONU), 'Auto'))
         Params.Target_ONU = max(1, round(getContext(context, 'type_index', 1)));
@@ -1117,7 +1117,7 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
         burstLengths(k) = size(branches{k}.field, 1);
         polCount = max(polCount, size(branches{k}.field, 2));
     end
-    guardSamples = round(safeGet(Params, {'Guard_Time'}, 2e-6) * Params.Fs_Tx);
+    guardSamples = round(safeGet(Params, {'Guard_Time'}, 45e-9) * Params.Fs_Tx);
     totalLength = sum(burstLengths) + (numONUs - 1) * guardSamples;
 
     frame = zeros(totalLength, polCount);
@@ -1147,7 +1147,7 @@ function [frame, meta, ok] = buildUplinkTdmFrame(ws, Params)
     meta.Params.num_bands = 1;
     meta.Params.Burst_Samples = max(burstLengths);
     meta.Params.Burst_Samples_Per_ONU = burstLengths;
-    meta.Params.Guard_Time = safeGet(Params, {'Guard_Time'}, 2e-6);
+    meta.Params.Guard_Time = safeGet(Params, {'Guard_Time'}, 45e-9);
     meta.Params.Guard_Samples = guardSamples;
     meta.Params.TDM_StartIdx_Rx = tdmStart;
     meta.Params.TDM_EndIdx_Rx = tdmEnd;
@@ -1339,7 +1339,7 @@ function Params = configureDemoLOParams(Params, ws)
     end
     ch = min(max(1, round(Params.ch)), numel(Params.cf));
     Params.ch = ch;
-    Params.Opt.Obj.LO.FreqOffset = Params.cf(ch) + Params.deltafs;
+    Params.Opt.Obj.LO.FreqOffset = Params.deltafs;
     fprintf('  DEMO LO tuned: ch=%d, cf=%.6g GHz, deltafs=%.6g GHz, FreqOffset=%.6g GHz\n', ...
         ch, Params.cf(ch)/1e9, Params.deltafs/1e9, Params.Opt.Obj.LO.FreqOffset/1e9);
 end

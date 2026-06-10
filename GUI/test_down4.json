@@ -1,11 +1,87 @@
 {
   "nodes": [
     {
+      "id": 42,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1854.0338566867174,
+      "y": 1134.7011275688392,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1832.7536976429674,
+      "y": 831.2946051149322,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1846.053797045311,
+      "y": 578.2641900399325,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1838.073737403905,
+      "y": 258.0219284054686,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
       "id": 34,
       "name": "LO",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
       "x": 1697.6739673443444,
-      "y": 1181.4857586243074,
+      "y": 1120.3053013735262,
       "params": {
         "Power": [
           "0",
@@ -39,7 +115,7 @@
       "name": "ONURxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
       "x": 2121.1731154693443,
-      "y": 1329.1847933118074,
+      "y": 1268.0043360610262,
       "params": {
         "Modulation": [
           "16QAM",
@@ -63,7 +139,7 @@
       "name": "ADC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
       "x": 1985.6739673443435,
-      "y": 1328.7248273743076,
+      "y": 1267.5443701235263,
       "params": {
         "Bandwidth": [
           "59",
@@ -87,7 +163,7 @@
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
       "x": 2276.4547735943443,
-      "y": 1328.2228398743077,
+      "y": 1267.0423826235265,
       "params": {
         "Enabled": [
           "True",
@@ -106,7 +182,7 @@
       "name": "ICR",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
       "x": 1697.1719798443437,
-      "y": 1329.4857586243074,
+      "y": 1268.3053013735262,
       "params": {
         "Bandwidth": [
           "25",
@@ -140,7 +216,7 @@
       "name": "TIA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
       "x": 1843.6739673443435,
-      "y": 1328.4817836243078,
+      "y": 1267.3013263735265,
       "params": {
         "Bandwidth": [
           "35",
@@ -159,7 +235,7 @@
       "name": "LO",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
       "x": 1691.6398957818442,
-      "y": 885.8162520618074,
+      "y": 824.6357948110262,
       "params": {
         "Power": [
           "0",
@@ -193,7 +269,7 @@
       "name": "ONURxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
       "x": 2115.1390439068446,
-      "y": 1033.515286749307,
+      "y": 972.3348294985258,
       "params": {
         "Modulation": [
           "16QAM",
@@ -217,7 +293,7 @@
       "name": "ADC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
       "x": 1979.6398957818442,
-      "y": 1033.0553208118072,
+      "y": 971.8748635610259,
       "params": {
         "Bandwidth": [
           "59",
@@ -241,7 +317,7 @@
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
       "x": 2270.4207020318445,
-      "y": 1032.5533333118074,
+      "y": 971.3728760610261,
       "params": {
         "Enabled": [
           "True",
@@ -260,7 +336,7 @@
       "name": "ICR",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
       "x": 1691.1379082818444,
-      "y": 1033.816252061807,
+      "y": 972.6357948110258,
       "params": {
         "Bandwidth": [
           "25",
@@ -294,7 +370,7 @@
       "name": "TIA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
       "x": 1837.6398957818442,
-      "y": 1032.8122770618074,
+      "y": 971.6318198110262,
       "params": {
         "Bandwidth": [
           "35",
@@ -605,8 +681,8 @@
       "id": 5,
       "name": "Modulator",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
-      "x": 651.8276249693454,
-      "y": 803.6739439680574,
+      "x": 646.5075852084078,
+      "y": 806.3339638485262,
       "params": {
         "Vpi": [
           "3",
@@ -624,7 +700,7 @@
       "id": 6,
       "name": "Fiber",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/fiber.jpg",
-      "x": 955.8068983287201,
+      "x": 955.80689832872,
       "y": 801.4269252180576,
       "params": {
         "Length": [
@@ -653,8 +729,8 @@
       "id": 7,
       "name": "OA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
-      "x": 800.6070112974703,
-      "y": 802.4269252180576,
+      "x": 797.9469914170015,
+      "y": 805.0869450985264,
       "params": {
         "Mode": [
           "OutputPower",
@@ -682,8 +758,8 @@
       "id": 8,
       "name": "ICR",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
-      "x": 1691.2741904693453,
-      "y": 384.1240283118083,
+      "x": 1693.934210349814,
+      "y": 416.0442668774333,
       "params": {
         "Bandwidth": [
           "25",
@@ -716,8 +792,8 @@
       "id": 9,
       "name": "TIA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
-      "x": 1837.776177969345,
-      "y": 383.1200533118082,
+      "x": 1840.4361978498139,
+      "y": 415.0402918774332,
       "params": {
         "Bandwidth": [
           "35",
@@ -735,8 +811,8 @@
       "id": 10,
       "name": "ADC",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
-      "x": 1979.7761779693446,
-      "y": 383.36309706180816,
+      "x": 1982.4361978498134,
+      "y": 415.2833356274332,
       "params": {
         "Bandwidth": [
           "59",
@@ -759,8 +835,8 @@
       "id": 11,
       "name": "ONURxDSP",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
-      "x": 2115.2753260943455,
-      "y": 383.8230629993078,
+      "x": 2117.9353459748145,
+      "y": 415.74330156493284,
       "params": {
         "Modulation": [
           "16QAM",
@@ -783,8 +859,8 @@
       "id": 12,
       "name": "E-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 2270.5569842193454,
-      "y": 382.8611095618081,
+      "x": 2273.2170040998144,
+      "y": 414.78134812743315,
       "params": {
         "Enabled": [
           "True",
@@ -802,8 +878,8 @@
       "id": 13,
       "name": "LO",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
-      "x": 1691.7761779693456,
-      "y": 236.12402831180827,
+      "x": 1694.4361978498143,
+      "y": 268.0442668774333,
       "params": {
         "Power": [
           "0",
@@ -836,8 +912,8 @@
       "id": 15,
       "name": "O-Analyzer",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
-      "x": 800.8531163295006,
-      "y": 960.5139010430574,
+      "x": 795.5330765685633,
+      "y": 960.5139010430576,
       "params": {
         "Enabled": [
           "True",
@@ -855,8 +931,8 @@
       "id": 35,
       "name": "VOA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/VOA.jpg",
-      "x": 1532.5584074224694,
-      "y": 383.88927749930747,
+      "x": 1535.2184273029382,
+      "y": 415.8095160649325,
       "params": {
         "Mode": [
           "OutputPower",
@@ -904,7 +980,7 @@
       "name": "VOA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/VOA.jpg",
       "x": 1534.8714681880942,
-      "y": 1033.8593526399318,
+      "y": 972.6788953891505,
       "params": {
         "Mode": [
           "OutputPower",
@@ -927,8 +1003,8 @@
       "id": 38,
       "name": "VOA",
       "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/VOA.jpg",
-      "x": 1546.4367720162193,
-      "y": 1327.618069874307,
+      "x": 1546.4367720162195,
+      "y": 1266.4376126235256,
       "params": {
         "Mode": [
           "OutputPower",
@@ -949,6 +1025,30 @@
     }
   ],
   "edges": [
+    {
+      "source_id": 24,
+      "source_side": "right",
+      "target_id": 41,
+      "target_side": "left"
+    },
+    {
+      "source_id": 30,
+      "source_side": "right",
+      "target_id": 42,
+      "target_side": "left"
+    },
+    {
+      "source_id": 18,
+      "source_side": "right",
+      "target_id": 40,
+      "target_side": "left"
+    },
+    {
+      "source_id": 8,
+      "source_side": "right",
+      "target_id": 39,
+      "target_side": "left"
+    },
     {
       "source_id": 34,
       "source_side": "bottom",
@@ -1174,57 +1274,57 @@
   ],
   "parameter_sweeps": [
     {
-      "enabled": true,
+      "enabled": false,
       "depth": 1,
       "node_id": 7,
       "component": "OA",
       "parameter": "OutputPower",
-      "start": "0",
-      "stop": "3",
+      "start": "6",
+      "stop": "10",
       "step": "1",
       "unit": "dBm"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "depth": 2,
       "node_id": 35,
       "component": "VOA",
       "parameter": "OutputPower",
-      "start": "-32",
-      "stop": "-28",
+      "start": "-30",
+      "stop": "-25",
       "step": "1",
       "unit": "dBm"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "depth": 2,
       "node_id": 36,
       "component": "VOA",
       "parameter": "OutputPower",
-      "start": "-32",
-      "stop": "-28",
+      "start": "-30",
+      "stop": "-25",
       "step": "1",
       "unit": "dBm"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "depth": 2,
       "node_id": 37,
       "component": "VOA",
       "parameter": "OutputPower",
-      "start": "-32",
-      "stop": "-28",
+      "start": "-30",
+      "stop": "-25",
       "step": "1",
       "unit": "dBm"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "depth": 2,
       "node_id": 38,
       "component": "VOA",
       "parameter": "OutputPower",
-      "start": "-32",
-      "stop": "-28",
+      "start": "-30",
+      "stop": "-25",
       "step": "1",
       "unit": "dBm"
     }

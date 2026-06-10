@@ -43,6 +43,14 @@ def _as_channels(signal) -> np.ndarray:
     return arr
 
 
+def _polarization_label(channel_index: int) -> str:
+    """Return user-facing polarization label for dual-pol traces."""
+    labels = ("X", "Y")
+    if channel_index < len(labels):
+        return labels[channel_index]
+    return f"Ch{channel_index + 1}"
+
+
 def _full_frame_preview_indices(data: np.ndarray, max_samples: int | None) -> np.ndarray:
     """Select preview samples across the whole frame, preserving burst peaks."""
     length = data.shape[0]
@@ -113,7 +121,7 @@ def draw_spectrum(ax, signal, fs: float, title: str = "Electrical Spectrum") -> 
     freq = _frequency_axis(n, fs)
     for ch in range(data.shape[1]):
         spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(freq / 1e9, _db_power(spectrum), linewidth=1.0, label=f"Ch{ch + 1}")
+        ax.plot(freq / 1e9, _db_power(spectrum), linewidth=1.0, label=_polarization_label(ch))
 
     ax.set_title(title)
     ax.set_xlabel("Frequency (GHz)")
@@ -145,7 +153,7 @@ def draw_optical_spectrum(
 
     for ch in range(data.shape[1]):
         spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(x / x_scale, _db_power(spectrum), linewidth=1.0, label=f"Pol{ch + 1}")
+        ax.plot(x / x_scale, _db_power(spectrum), linewidth=1.0, label=_polarization_label(ch))
 
     ax.set_title(title)
     ax.set_xlabel(x_label)
@@ -177,7 +185,14 @@ def draw_constellation(
             rms = np.sqrt(np.mean(np.abs(samples) ** 2))
             if rms > 0:
                 samples = samples / rms
-        ax.scatter(np.real(samples), np.imag(samples), s=5, alpha=0.35, edgecolors="none", label=f"Ch{ch + 1}")
+        ax.scatter(
+            np.real(samples),
+            np.imag(samples),
+            s=5,
+            alpha=0.35,
+            edgecolors="none",
+            label=_polarization_label(ch),
+        )
 
     ax.axhline(0, color="0.55", linewidth=0.8)
     ax.axvline(0, color="0.55", linewidth=0.8)
@@ -217,9 +232,10 @@ def draw_time_waveform(
 
     for ch in range(data.shape[1]):
         y = data[:, ch]
-        ax.plot(x, np.real(y), linewidth=1.0, label=f"Ch{ch + 1} real")
+        pol_label = _polarization_label(ch)
+        ax.plot(x, np.real(y), linewidth=1.0, label=f"{pol_label} real")
         if np.iscomplexobj(y):
-            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"Ch{ch + 1} imag")
+            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag")
 
     ax.set_title(title)
     ax.set_xlabel(x_label)
@@ -260,9 +276,10 @@ def plot_time_waveform(
     fig, ax = plt.subplots(figsize=(8.5, 3.8))
     for ch in range(data.shape[1]):
         y = data[:, ch]
-        ax.plot(x, np.real(y), linewidth=1.0, label=f"Ch{ch + 1} real")
+        pol_label = _polarization_label(ch)
+        ax.plot(x, np.real(y), linewidth=1.0, label=f"{pol_label} real")
         if np.iscomplexobj(y):
-            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"Ch{ch + 1} imag")
+            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag")
 
     ax.set_title(title)
     ax.set_xlabel(x_label)

@@ -59,7 +59,7 @@ function [SNR, BER, ResultData] = OC_RxDSP_Module(Rx_Dig_X, Rx_Dig_Y, SigX, SigY
     h = abs(fftshift(fft(FOC_input))); % Use fftshift to search both pos and neg frequencies
     
     [~, f_idx] = max(h);
-    FreOffset0 = (f_idx - 1 - floor(N_foc/2)) * Fs_Rx / N_foc;
+    FreOffset0 = Params.cf(ch) + (f_idx - 1 - floor(N_foc/2)) * Fs_Rx / N_foc;
     disp(['Estimated Residual FO: ', num2str(FreOffset0/1e9), ' GHz']);
 
     %% 3. Frequency Offset Compensation (Baseband Shift)
