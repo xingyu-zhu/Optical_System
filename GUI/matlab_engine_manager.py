@@ -42,14 +42,17 @@ class MatlabEngineManager:
                 self._configure_project_paths()
                 return self._engine
 
-            self._configure_engine_python_path()
-
             try:
                 import matlab.engine
-            except Exception as exc:
-                raise RuntimeError(
-                    self._engine_import_error_message(exc)
-                ) from exc
+            except Exception as first_exc:
+                self._clear_partial_matlab_imports()
+                self._configure_engine_python_path()
+                try:
+                    import matlab.engine
+                except Exception as exc:
+                    raise RuntimeError(
+                        self._engine_import_error_message(exc, first_exc)
+                    ) from exc
 
             if connect_existing:
                 try:
@@ -81,7 +84,7 @@ class MatlabEngineManager:
         self._configure_windows_runtime_paths(roots)
         candidates = self._matlab_engine_path_candidates_for_roots(roots)
         for path in candidates:
-            if path.exists():
+            if path.exists() and self._engine_python_path_is_usable(path):
                 text = str(path)
                 if text not in sys.path:
                     sys.path.insert(0, text)
@@ -101,6 +104,27 @@ class MatlabEngineManager:
                 ]
             )
         return self._unique_existing_or_possible_paths(paths)
+
+    @staticmethod
+    def _clear_partial_matlab_imports() -> None:
+        for name in list(sys.modules):
+            if name == "matlab" or name.startswith("matlab."):
+                sys.modules.pop(name, None)
+
+    @staticmethod
+    def _engine_python_path_is_usable(path: Path) -> bool:
+        """Return True only for paths that can reasonably be imported directly."""
+        engine_pkg = path / "matlab" / "engine"
+        if not engine_pkg.exists():
+            return False
+
+        arch_file = engine_pkg / "_arch.txt"
+        if arch_file.exists():
+            try:
+                arch_file.read_text(encoding="utf-8")
+            except Exception:
+                return False
+        return True
 
     def _matlab_root_candidates(self) -> list[Path]:
         roots: list[Path] = []
@@ -267,18 +291,24 @@ class MatlabEngineManager:
                 path_parts.insert(0, text)
         os.environ["PATH"] = os.pathsep.join(path_parts)
 
-    def _engine_import_error_message(self, original_error: Exception | None = None) -> str:
+    def _engine_import_error_message(
+        self,
+        original_error: Exception | None = None,
+        first_error: Exception | None = None,
+    ) -> str:
         roots = self._matlab_root_candidates()
         candidates = self._matlab_engine_path_candidates()
         existing = [str(path) for path in candidates if path.exists()]
         root_text = ", ".join(str(root) for root in roots) if roots else "未检测到 MATLAB 安装目录"
         path_text = ", ".join(existing) if existing else "未检测到可用的 MATLAB Engine Python 路径"
         detail = f"\n原始错误: {type(original_error).__name__}: {original_error}" if original_error else ""
+        first_detail = f"\n首次导入错误: {type(first_error).__name__}: {first_error}" if first_error else ""
         return (
             "Unable to import matlab.engine. 请先安装与当前 Python 版本兼容的 MATLAB Engine for Python。\n"
             f"检测到的 MATLAB 根目录: {root_text}\n"
             f"检测到的 Engine 路径: {path_text}\n"
             "安装方式示例: cd <MATLABROOT>/extern/engines/python && python -m pip install ."
+            f"{first_detail}"
             f"{detail}"
         )
 
