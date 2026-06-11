@@ -17,7 +17,9 @@ from matlab_topology_runner import MatlabTopologyRunner
 from topology_executor import TopologyExecutor
 
 
-def node(node_id: int, name: str, params: dict[str, list[str]] | None = None) -> dict[str, Any]:
+def node(
+    node_id: int, name: str, params: dict[str, list[str]] | None = None
+) -> dict[str, Any]:
     return {
         "id": node_id,
         "name": name,
@@ -144,7 +146,9 @@ def build_uplink_topology(num_onu: int, target_onu: int) -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-def summarize_outputs(outputs: dict[int, dict[str, Any]], topology: dict[str, Any]) -> dict[str, Any]:
+def summarize_outputs(
+    outputs: dict[int, dict[str, Any]], topology: dict[str, Any]
+) -> dict[str, Any]:
     names = {int(n["id"]): n["name"] for n in topology["nodes"]}
     rows: list[dict[str, Any]] = []
     for node_id, node_outputs in sorted(outputs.items()):
@@ -169,10 +173,21 @@ def summarize_outputs(outputs: dict[int, dict[str, Any]], topology: dict[str, An
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run GUI uplink topology test cases")
-    parser.add_argument("--cases", nargs="+", type=int, default=[1, 2, 4], help="ONU counts to test")
-    parser.add_argument("--target-onu", type=int, default=1, help="Target ONU slot to decode")
-    parser.add_argument("--plan-only", action="store_true", help="Only print topology schedule")
-    parser.add_argument("--dump-dir", type=Path, default=None, help="Optional directory to write topology JSONs")
+    parser.add_argument(
+        "--cases", nargs="+", type=int, default=[1, 2, 4], help="ONU counts to test"
+    )
+    parser.add_argument(
+        "--target-onu", type=int, default=1, help="Target ONU slot to decode"
+    )
+    parser.add_argument(
+        "--plan-only", action="store_true", help="Only print topology schedule"
+    )
+    parser.add_argument(
+        "--dump-dir",
+        type=Path,
+        default=None,
+        help="Optional directory to write topology JSONs",
+    )
     args = parser.parse_args()
 
     if args.dump_dir:
@@ -183,7 +198,9 @@ def main() -> int:
         topology = build_uplink_topology(num_onu, target_onu)
         if args.dump_dir:
             path = args.dump_dir / f"uplink_{num_onu}onu.json"
-            path.write_text(json.dumps(topology, ensure_ascii=False, indent=2), encoding="utf-8")
+            path.write_text(
+                json.dumps(topology, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
 
         print(f"\n=== Uplink topology: {num_onu} ONU(s), target ONU {target_onu} ===")
         executor = TopologyExecutor(topology)
@@ -194,9 +211,18 @@ def main() -> int:
         if args.plan_only:
             continue
 
-        runner = MatlabTopologyRunner(MatlabEngineManager(), log=lambda msg, src="INFO": print(f"[{src}] {msg}"))
+        runner = MatlabTopologyRunner(
+            MatlabEngineManager(), log=lambda msg, src="INFO": print(f"[{src}] {msg}")
+        )
         outputs = runner.run(topology)
-        print(json.dumps(summarize_outputs(outputs, topology), ensure_ascii=False, indent=2, default=str))
+        print(
+            json.dumps(
+                summarize_outputs(outputs, topology),
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            )
+        )
 
     return 0
 

@@ -3,22 +3,28 @@
 from __future__ import annotations
 
 import copy
+import gc
 import itertools
 import math
-import gc
 import re
 import subprocess
-import time
 import threading
+import time
 from typing import Any, Callable
 
 import numpy as np
 
-from matlab_component_registry import component_type_for_component, matlab_function_for_component
+from matlab_component_registry import (
+    component_type_for_component,
+    matlab_function_for_component,
+)
 from matlab_engine_manager import MatlabEngineManager
-from topology_display import build_component_display_names, build_node_display_indices, result_component_allowed
+from topology_display import (
+    build_component_display_names,
+    build_node_display_indices,
+    result_component_allowed,
+)
 from topology_executor import Node, TopologyExecutor
-
 
 LogCallback = Callable[[str, str], None]
 
@@ -49,18 +55,18 @@ class MatlabTopologyRunner:
 
     def _run_once(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
         executor = TopologyExecutor(topology)
-        levels = executor.topological_levels()
         node_contexts = self._build_node_contexts(executor)
         _, _, incoming_edges, outgoing_edges = executor._build_graph()
         remaining_cache_consumers = {
-            node_id: len(outgoing_edges.get(node_id, []))
-            for node_id in executor.nodes
+            node_id: len(outgoing_edges.get(node_id, [])) for node_id in executor.nodes
         }
 
         eng = self.engine_manager.start()
         self._clear_matlab_workspace_cache(eng)
 
-        def component_runner(node: Node, inputs_by_port: dict[str, Any]) -> dict[str, Any]:
+        def component_runner(
+            node: Node, inputs_by_port: dict[str, Any]
+        ) -> dict[str, Any]:
             self._raise_if_cancelled()
             function_name = matlab_function_for_component(node.name)
             node_context = node_contexts[node.node_id]
@@ -90,7 +96,9 @@ class MatlabTopologyRunner:
                 if remaining_cache_consumers[edge.source_id] == 0:
                     source_node = executor.nodes.get(edge.source_id)
                     if source_node is not None:
-                        self._delete_matlab_workspace_cache_ref(eng, source_node.node_id, source_node.name)
+                        self._delete_matlab_workspace_cache_ref(
+                            eng, source_node.node_id, source_node.name
+                        )
             if remaining_cache_consumers.get(node.node_id, 0) == 0:
                 self._delete_matlab_workspace_cache_ref(eng, node.node_id, node.name)
             return {
@@ -107,7 +115,9 @@ class MatlabTopologyRunner:
         finally:
             self._cleanup_matlab_after_run(eng)
 
-    def _run_parameter_sweep(self, topology: dict[str, Any], sweep: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    def _run_parameter_sweep(
+        self, topology: dict[str, Any], sweep: dict[str, Any]
+    ) -> dict[int, dict[str, Any]]:
         points = list(self._iter_sweep_points(sweep["depth_groups"]))
         rows: list[dict[str, Any]] = []
         last_outputs: dict[int, dict[str, Any]] = {}
@@ -116,7 +126,9 @@ class MatlabTopologyRunner:
 
         for index, point in enumerate(points, start=1):
             self._raise_if_cancelled()
-            point_topology = self._topology_with_sweep_values(topology, point["assignments"])
+            point_topology = self._topology_with_sweep_values(
+                topology, point["assignments"]
+            )
             self.log(f"参数扫描 {index}/{total}", "INFO")
             outputs = self._run_once(point_topology)
             last_outputs = outputs
@@ -134,7 +146,9 @@ class MatlabTopologyRunner:
         if self.cancel_event is not None and self.cancel_event.is_set():
             raise SimulationCancelled("用户已停止仿真。")
 
-    def _feval_interruptible(self, eng, func_name: str, *args: Any, nargout: int = 1) -> Any:
+    def _feval_interruptible(
+        self, eng, func_name: str, *args: Any, nargout: int = 1
+    ) -> Any:
         if self.cancel_event is None:
             return eng.feval(func_name, *args, nargout=nargout)
 
@@ -163,7 +177,9 @@ class MatlabTopologyRunner:
     def _build_parameter_sweep(self, topology: dict[str, Any]) -> dict[str, Any] | None:
         axes: list[dict[str, Any]] = []
         errors: list[str] = []
-        node_by_id = {int(node["id"]): node for node in topology.get("nodes", []) if "id" in node}
+        node_by_id = {
+            int(node["id"]): node for node in topology.get("nodes", []) if "id" in node
+        }
         for item in topology.get("parameter_sweeps", []):
             if not item.get("enabled", True):
                 continue
@@ -176,9 +192,13 @@ class MatlabTopologyRunner:
             if not node:
                 errors.append(f"启用的参数扫描指向不存在的节点 {node_id}。")
                 continue
-            values = self._range_from_values(item.get("start"), item.get("stop"), item.get("step"))
+            values = self._range_from_values(
+                item.get("start"), item.get("stop"), item.get("step")
+            )
             if not values:
-                component_name = str(item.get("component") or node.get("name", f"Node {node_id}"))
+                component_name = str(
+                    item.get("component") or node.get("name", f"Node {node_id}")
+                )
                 errors.append(
                     f"{component_name}.{parameter} 的扫描范围无效，请检查起始、终止和步长。"
                 )
@@ -210,7 +230,9 @@ class MatlabTopologyRunner:
         return {"axes": axes, "depth_groups": depth_groups}
 
     def _iter_sweep_points(self, depth_groups: list[dict[str, Any]]):
-        grouped_points = [self._simultaneous_group_points(group["axes"]) for group in depth_groups]
+        grouped_points = [
+            self._simultaneous_group_points(group["axes"]) for group in depth_groups
+        ]
         for combo in itertools.product(*grouped_points):
             assignments: list[dict[str, Any]] = []
             values_by_kind: dict[str, float] = {}
@@ -225,7 +247,9 @@ class MatlabTopologyRunner:
                 "label": ", ".join(value_labels),
             }
 
-    def _simultaneous_group_points(self, axes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _simultaneous_group_points(
+        self, axes: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         if not axes:
             return [{"assignments": [], "values_by_kind": {}, "labels": []}]
         length = max(len(axis["values"]) for axis in axes)
@@ -242,8 +266,16 @@ class MatlabTopologyRunner:
                 assignments.append(assignment)
                 if axis["kind"] not in {"parameter"}:
                     values_by_kind[axis["kind"]] = value
-                labels.append(f"{axis['label']}={self._format_number(value)}{axis.get('unit', '')}")
-            points.append({"assignments": assignments, "values_by_kind": values_by_kind, "labels": labels})
+                labels.append(
+                    f"{axis['label']}={self._format_number(value)}{axis.get('unit', '')}"
+                )
+            points.append(
+                {
+                    "assignments": assignments,
+                    "values_by_kind": values_by_kind,
+                    "labels": labels,
+                }
+            )
         return points
 
     def _topology_with_sweep_values(
@@ -260,8 +292,16 @@ class MatlabTopologyRunner:
                 continue
             params = node.setdefault("params", {})
             old = params.get(assignment["param"], ["", assignment.get("unit", ""), ""])
-            unit = old[1] if isinstance(old, list) and len(old) > 1 else assignment.get("unit", "")
-            desc = old[2] if isinstance(old, list) and len(old) > 2 else assignment.get("label", "")
+            unit = (
+                old[1]
+                if isinstance(old, list) and len(old) > 1
+                else assignment.get("unit", "")
+            )
+            desc = (
+                old[2]
+                if isinstance(old, list) and len(old) > 2
+                else assignment.get("label", "")
+            )
             params[assignment["param"]] = [self._format_number(value), unit, desc]
         return data
 
@@ -306,8 +346,12 @@ class MatlabTopologyRunner:
                         "component": f"{display_name}{suffix}",
                         "sweep_label": point.get("label", ""),
                         "sweep_values": sweep_values,
-                        "tx_power_dbm": values_by_kind.get("tx_power_dbm", baseline_values.get("tx_power_dbm")),
-                        "rop_dbm": values_by_kind.get("rop_dbm", baseline_values.get("rop_dbm")),
+                        "tx_power_dbm": values_by_kind.get(
+                            "tx_power_dbm", baseline_values.get("tx_power_dbm")
+                        ),
+                        "rop_dbm": values_by_kind.get(
+                            "rop_dbm", baseline_values.get("rop_dbm")
+                        ),
                         "SNR": self._metric_value(snr_values, metric_index),
                         "BER": self._metric_value(ber_values, metric_index),
                     }
@@ -316,12 +360,16 @@ class MatlabTopologyRunner:
 
     def _baseline_power_values(self, topology: dict[str, Any]) -> dict[str, float]:
         values: dict[str, float] = {}
-        nodes = {int(node["id"]): node for node in topology.get("nodes", []) if "id" in node}
+        nodes = {
+            int(node["id"]): node for node in topology.get("nodes", []) if "id" in node
+        }
         incoming_edges = self._incoming_edges_by_target(topology)
 
         tx_power = self._launch_power_before_fiber(nodes, incoming_edges)
         if tx_power is None:
-            tx_power = self._first_power_for_type(nodes, incoming_edges, {"oa", "edfa", "lasercw", "laser"})
+            tx_power = self._first_power_for_type(
+                nodes, incoming_edges, {"oa", "edfa", "lasercw", "laser"}
+            )
         if tx_power is not None:
             values["tx_power_dbm"] = tx_power
 
@@ -331,7 +379,9 @@ class MatlabTopologyRunner:
         return values
 
     @staticmethod
-    def _incoming_edges_by_target(topology: dict[str, Any]) -> dict[int, list[dict[str, Any]]]:
+    def _incoming_edges_by_target(
+        topology: dict[str, Any],
+    ) -> dict[int, list[dict[str, Any]]]:
         incoming: dict[int, list[dict[str, Any]]] = {}
         for edge in topology.get("edges", []):
             try:
@@ -369,7 +419,9 @@ class MatlabTopologyRunner:
         for node_id, node in sorted(nodes.items()):
             component_type = component_type_for_component(str(node.get("name", "")))
             if component_type in component_types:
-                power = self._node_output_power_dbm(node_id, nodes, incoming_edges, set())
+                power = self._node_output_power_dbm(
+                    node_id, nodes, incoming_edges, set()
+                )
                 if power is not None:
                     return power
         return None
@@ -416,7 +468,9 @@ class MatlabTopologyRunner:
         if component_type in {"oa", "edfa"}:
             mode = self._param_mode(params, output_power_default=True)
             if mode == "gain":
-                upstream = self._upstream_power_dbm(node_id, nodes, incoming_edges, seen)
+                upstream = self._upstream_power_dbm(
+                    node_id, nodes, incoming_edges, seen
+                )
                 gain = self._param_float(params, "Gain")
                 if upstream is not None and gain is not None:
                     return upstream + gain
@@ -428,7 +482,9 @@ class MatlabTopologyRunner:
         if component_type == "voa":
             mode = self._param_mode(params, output_power_default=True)
             if mode == "attenuation":
-                upstream = self._upstream_power_dbm(node_id, nodes, incoming_edges, seen)
+                upstream = self._upstream_power_dbm(
+                    node_id, nodes, incoming_edges, seen
+                )
                 attenuation = self._param_float(params, "Attenuation")
                 if upstream is not None and attenuation is not None:
                     return upstream - attenuation
@@ -442,7 +498,9 @@ class MatlabTopologyRunner:
     def _param_float(self, params: dict[str, Any], name: str) -> float | None:
         return self._float_or_none(self._param_value(params.get(name)))
 
-    def _param_mode(self, params: dict[str, Any], output_power_default: bool = True) -> str:
+    def _param_mode(
+        self, params: dict[str, Any], output_power_default: bool = True
+    ) -> str:
         value = self._param_value(params.get("Mode"))
         text = str(value if value is not None else "").strip().lower()
         if "atten" in text or "衰减" in text:
@@ -451,16 +509,24 @@ class MatlabTopologyRunner:
             return "gain"
         return "outputpower" if output_power_default else text
 
-    def _compute_power_budget(self, rows: list[dict[str, Any]], fec_limit: float = 1e-2) -> list[dict[str, Any]]:
+    def _compute_power_budget(
+        self, rows: list[dict[str, Any]], fec_limit: float = 1e-2
+    ) -> list[dict[str, Any]]:
         by_key: dict[tuple[float | None, int, str], list[dict[str, Any]]] = {}
         for row in rows:
             if row.get("tx_power_dbm") is None or row.get("rop_dbm") is None:
                 continue
-            key = (row.get("tx_power_dbm"), int(row.get("node_id", 0)), str(row.get("component", "")))
+            key = (
+                row.get("tx_power_dbm"),
+                int(row.get("node_id", 0)),
+                str(row.get("component", "")),
+            )
             by_key.setdefault(key, []).append(row)
 
         budget_rows: list[dict[str, Any]] = []
-        for (tx_power, node_id, component), group in sorted(by_key.items(), key=lambda item: (item[0][0], item[0][1])):
+        for (tx_power, node_id, component), group in sorted(
+            by_key.items(), key=lambda item: (item[0][0], item[0][1])
+        ):
             sensitivity = self._interpolate_sensitivity(group, fec_limit)
             budget = None if sensitivity is None else float(tx_power) - sensitivity
             budget_rows.append(
@@ -476,7 +542,9 @@ class MatlabTopologyRunner:
             )
         return budget_rows
 
-    def _interpolate_sensitivity(self, rows: list[dict[str, Any]], fec_limit: float) -> float | None:
+    def _interpolate_sensitivity(
+        self, rows: list[dict[str, Any]], fec_limit: float
+    ) -> float | None:
         points = []
         for row in rows:
             rop = self._float_or_none(row.get("rop_dbm"))
@@ -508,14 +576,18 @@ class MatlabTopologyRunner:
         return None
 
     @staticmethod
-    def _range_from_values(start_value: Any, stop_value: Any, step_value: Any) -> list[float] | None:
+    def _range_from_values(
+        start_value: Any, stop_value: Any, step_value: Any
+    ) -> list[float] | None:
         start = MatlabTopologyRunner._float_or_none(start_value)
         stop = MatlabTopologyRunner._float_or_none(stop_value)
         step = MatlabTopologyRunner._float_or_none(step_value)
         return MatlabTopologyRunner._range_from_numbers(start, stop, step)
 
     @staticmethod
-    def _range_from_numbers(start: float | None, stop: float | None, step: float | None) -> list[float] | None:
+    def _range_from_numbers(
+        start: float | None, stop: float | None, step: float | None
+    ) -> list[float] | None:
         if start is None or stop is None:
             return None
         if step is None or step == 0:
@@ -526,7 +598,10 @@ class MatlabTopologyRunner:
         values: list[float] = []
         current = start
         limit = 1000
-        while len(values) < limit and ((step > 0 and current <= stop + 1e-12) or (step < 0 and current >= stop - 1e-12)):
+        while len(values) < limit and (
+            (step > 0 and current <= stop + 1e-12)
+            or (step < 0 and current >= stop - 1e-12)
+        ):
             values.append(round(current, 12))
             current += step
         return values or None
@@ -573,7 +648,12 @@ class MatlabTopologyRunner:
     def _workspace_from_outputs(outputs: Any) -> dict[str, Any]:
         if not isinstance(outputs, dict):
             return {}
-        workspace = outputs.get("default") or outputs.get("right") or outputs.get("bottom") or outputs.get("info")
+        workspace = (
+            outputs.get("default")
+            or outputs.get("right")
+            or outputs.get("bottom")
+            or outputs.get("info")
+        )
         return workspace if isinstance(workspace, dict) else {}
 
     @staticmethod
@@ -603,14 +683,32 @@ class MatlabTopologyRunner:
     def _clear_matlab_workspace_cache(self, eng) -> None:
         """Release full per-node MATLAB workspaces after Python has summaries."""
         try:
-            eng.feval("OC_GUI_RunWorkspaceComponent", "__clear_cache__", "", {}, {}, {}, nargout=0)
+            eng.feval(
+                "OC_GUI_RunWorkspaceComponent",
+                "__clear_cache__",
+                "",
+                {},
+                {},
+                {},
+                nargout=0,
+            )
         except Exception:
             pass
 
-    def _delete_matlab_workspace_cache_ref(self, eng, node_id: int, component_name: str) -> None:
+    def _delete_matlab_workspace_cache_ref(
+        self, eng, node_id: int, component_name: str
+    ) -> None:
         try:
             ref = self._workspace_ref_for_node(node_id, component_name)
-            eng.feval("OC_GUI_RunWorkspaceComponent", "__delete_cache__", ref, {}, {}, {}, nargout=0)
+            eng.feval(
+                "OC_GUI_RunWorkspaceComponent",
+                "__delete_cache__",
+                ref,
+                {},
+                {},
+                {},
+                nargout=0,
+            )
         except Exception:
             pass
 
@@ -673,7 +771,9 @@ class MatlabTopologyRunner:
             message = f"组件 {node.name} 状态: {status}"
         self.log(message, "MATLAB")
 
-    def _log_final_metrics(self, outputs: dict[int, dict[str, Any]], topology: dict[str, Any]) -> None:
+    def _log_final_metrics(
+        self, outputs: dict[int, dict[str, Any]], topology: dict[str, Any]
+    ) -> None:
         nodes = topology.get("nodes", [])
         names = {int(n["id"]): str(n.get("name", "")) for n in nodes}
         display_names = build_component_display_names(nodes)
@@ -695,7 +795,9 @@ class MatlabTopologyRunner:
                 suffix = f" ONU {idx + 1}" if metric_count > 1 else ""
                 snr = self._metric_value(snr_values, idx)
                 ber = self._metric_value(ber_values, idx)
-                rows.append(f"{display_name}{suffix}: SNR={self._format_metric(snr)} dB, BER={self._format_metric(ber)}")
+                rows.append(
+                    f"{display_name}{suffix}: SNR={self._format_metric(snr)} dB, BER={self._format_metric(ber)}"
+                )
         if rows:
             self.log("最终 BER/SNR:", "MATLAB")
             for row in rows:
@@ -710,7 +812,9 @@ class MatlabTopologyRunner:
         except Exception:
             return str(value)
 
-    def _build_node_contexts(self, executor: TopologyExecutor) -> dict[int, dict[str, Any]]:
+    def _build_node_contexts(
+        self, executor: TopologyExecutor
+    ) -> dict[int, dict[str, Any]]:
         """Assign per-type indices and topology metadata to every node."""
         _, indegree, incoming_edges, outgoing_edges = executor._build_graph()
 
@@ -771,8 +875,12 @@ class MatlabTopologyRunner:
                 "upstream_tx_bands": upstream_tx_bands,
                 "is_source": indegree[node_id] == 0,
                 "is_sink": len(outgoing_edges.get(node_id, [])) == 0,
-                "incoming_ports": [edge.target_side for edge in incoming_edges.get(node_id, [])],
-                "outgoing_ports": [edge.source_side for edge in outgoing_edges.get(node_id, [])],
+                "incoming_ports": [
+                    edge.target_side for edge in incoming_edges.get(node_id, [])
+                ],
+                "outgoing_ports": [
+                    edge.source_side for edge in outgoing_edges.get(node_id, [])
+                ],
                 "downstream_rx_type": downstream_rx[0],
                 "downstream_rx_index": downstream_rx[1],
                 "downstream_rx_count": downstream_rx[2],
@@ -823,7 +931,9 @@ class MatlabTopologyRunner:
                 if "rxdsp" in component_type:
                     rx_matches.append(current)
                 else:
-                    next_queue.extend(edge.target_id for edge in outgoing_edges.get(current, []))
+                    next_queue.extend(
+                        edge.target_id for edge in outgoing_edges.get(current, [])
+                    )
             queue = next_queue
 
         if len(rx_matches) == 1:

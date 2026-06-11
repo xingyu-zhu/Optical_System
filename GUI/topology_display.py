@@ -6,7 +6,6 @@ from typing import Any
 
 from matlab_component_registry import component_type_for_component
 
-
 RESULT_EXCLUDED_TYPES = {"eanalyzer"}
 
 
@@ -27,7 +26,10 @@ def build_component_display_names(nodes: list[dict[str, Any]]) -> dict[int, str]
 def build_node_display_indices(nodes: list[dict[str, Any]]) -> dict[int, int]:
     """Return compact display indices like 1, 2, 3 for current design nodes."""
     sorted_nodes = sorted(nodes, key=lambda item: int(item.get("id", 0)))
-    return {int(node.get("id", 0)): index for index, node in enumerate(sorted_nodes, start=1)}
+    return {
+        int(node.get("id", 0)): index
+        for index, node in enumerate(sorted_nodes, start=1)
+    }
 
 
 def result_component_allowed(component_name: str) -> bool:

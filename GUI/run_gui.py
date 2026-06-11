@@ -5,8 +5,16 @@ from __future__ import annotations
 import sys
 import time
 
-from PyQt5.QtCore import QThread, Qt, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QFileDialog, QLabel, QMessageBox, QProgressBar, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app_style import apply_app_style
 from main_window import MainWindow
@@ -49,7 +57,9 @@ class StartupWindow(QWidget):
 
         self.title_label = QLabel("多维复用超高速光接入端到端系统仿真平台", self)
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet("font-size: 26px; font-weight: 700; color: #1f2f40;")
+        self.title_label.setStyleSheet(
+            "font-size: 26px; font-weight: 700; color: #1f2f40;"
+        )
 
         self.dev_label = QLabel("香港理工大学深圳研究院光子研究中心", self)
         self.dev_label.setAlignment(Qt.AlignCenter)
@@ -79,7 +89,6 @@ class StartupWindow(QWidget):
         self.status_label.setText(text)
 
 
-
 def _move_window_to_startup_screen(startup: QWidget, window: QWidget) -> None:
     screen = startup.screen()
     if screen is None:
@@ -98,7 +107,9 @@ def main() -> int:
 
     startup = StartupWindow()
     startup.adjustSize()
-    startup.move((app.primaryScreen().availableGeometry().center() - startup.rect().center()))
+    startup.move(
+        (app.primaryScreen().availableGeometry().center() - startup.rect().center())
+    )
     startup.show()
 
     startup_attempts = {"manual_prompted": False}
@@ -144,15 +155,21 @@ def main() -> int:
                         QMessageBox.warning(startup, "MATLAB 路径无效", str(exc))
 
         startup.close()
-        window = MainWindow(engine_manager=MatlabEngineManager(), initial_engine_status="Error")
-        window.output_widget.append_message(f"Startup error: {error_text}", source="ERROR")
+        window = MainWindow(
+            engine_manager=MatlabEngineManager(), initial_engine_status="Error"
+        )
+        window.output_widget.append_message(
+            f"Startup error: {error_text}", source="ERROR"
+        )
         _move_window_to_startup_screen(startup, window)
         window.show()
         app._main_window = window
 
     def on_succeeded(engine_manager: MatlabEngineManager) -> None:
         startup.close()
-        window = MainWindow(engine_manager=engine_manager, initial_engine_status="Ready")
+        window = MainWindow(
+            engine_manager=engine_manager, initial_engine_status="Ready"
+        )
         window.output_widget.append_matlab("MATLAB engine initialized during startup.")
         _move_window_to_startup_screen(startup, window)
         window.show()

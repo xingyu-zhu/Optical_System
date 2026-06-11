@@ -106,7 +106,9 @@ class ComponentPanel(QWidget):
         c_layout.addWidget(list_widget, 1)
         return container, list_widget
 
-    def _on_component_clicked(self, item: QListWidgetItem, source_list: QListWidget) -> None:
+    def _on_component_clicked(
+        self, item: QListWidgetItem, source_list: QListWidget
+    ) -> None:
         for list_widget in self._list_widgets:
             if list_widget is source_list:
                 continue

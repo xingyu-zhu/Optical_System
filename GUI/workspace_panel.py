@@ -10,6 +10,7 @@ from PyQt5.QtCore import QPointF, Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QKeySequence, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QGraphicsEllipseItem,
@@ -22,7 +23,6 @@ from PyQt5.QtWidgets import (
     QGraphicsView,
     QLabel,
     QMenu,
-    QComboBox,
     QShortcut,
     QTableWidget,
     QTableWidgetItem,
@@ -32,7 +32,6 @@ from PyQt5.QtWidgets import (
 
 from component_catalog import resolve_icon_path
 from topology_display import build_component_display_names
-
 
 BOOLEAN_VALUES = {"true", "false"}
 DEPRECATED_SCAN_PARAMS = {
@@ -201,7 +200,9 @@ class ComponentParameterDialog(QDialog):
             elif self._is_boolean_value(value):
                 combo = QComboBox(self.table)
                 combo.addItems(["True", "False"])
-                combo.setCurrentText("True" if str(value).strip().lower() == "true" else "False")
+                combo.setCurrentText(
+                    "True" if str(value).strip().lower() == "true" else "False"
+                )
                 self.table.setCellWidget(row, 1, combo)
             else:
                 self.table.setItem(row, 1, QTableWidgetItem(str(value)))
@@ -215,9 +216,13 @@ class ComponentParameterDialog(QDialog):
             key = self.table.item(row, 0).text().strip()
             hidden = False
             if component in {"oa", "edfa"}:
-                hidden = (mode == "OutputPower" and key == "Gain") or (mode == "Gain" and key == "OutputPower")
+                hidden = (mode == "OutputPower" and key == "Gain") or (
+                    mode == "Gain" and key == "OutputPower"
+                )
             elif component == "voa":
-                hidden = (mode == "OutputPower" and key == "Attenuation") or (mode == "Attenuation" and key == "OutputPower")
+                hidden = (mode == "OutputPower" and key == "Attenuation") or (
+                    mode == "Attenuation" and key == "OutputPower"
+                )
             self.table.setRowHidden(row, hidden)
 
     def _current_mode(self) -> str:
@@ -243,7 +248,9 @@ class ComponentParameterDialog(QDialog):
         component = self.component_name.strip().lower()
         if component == "voa" and any(token in text for token in ("atten", "衰减")):
             return "Attenuation"
-        if component in {"oa", "edfa"} and any(token in text for token in ("gain", "增益")):
+        if component in {"oa", "edfa"} and any(
+            token in text for token in ("gain", "增益")
+        ):
             return "Gain"
         return "OutputPower"
 
@@ -255,9 +262,21 @@ class ComponentParameterDialog(QDialog):
             if isinstance(widget, QComboBox):
                 value = widget.currentText()
             else:
-                value = self.table.item(row, 1).text().strip() if self.table.item(row, 1) else ""
-            unit = self.table.item(row, 2).text().strip() if self.table.item(row, 2) else ""
-            desc = self.table.item(row, 3).text().strip() if self.table.item(row, 3) else ""
+                value = (
+                    self.table.item(row, 1).text().strip()
+                    if self.table.item(row, 1)
+                    else ""
+                )
+            unit = (
+                self.table.item(row, 2).text().strip()
+                if self.table.item(row, 2)
+                else ""
+            )
+            desc = (
+                self.table.item(row, 3).text().strip()
+                if self.table.item(row, 3)
+                else ""
+            )
             out[k] = [value, unit, desc]
         return out
 
@@ -357,9 +376,13 @@ class NodeItem(QGraphicsRectItem):
         font.setPointSize(8)
         self.name_item.setFont(font)
         self.name_item.setBrush(QColor("#24384f"))
-        self.name_item.setPos((self.WIDTH - self.name_item.boundingRect().width()) / 2, 74)
+        self.name_item.setPos(
+            (self.WIDTH - self.name_item.boundingRect().width()) / 2, 74
+        )
 
-        self.highlight_rect = QGraphicsRectItem(2, 2, self.WIDTH - 4, self.HEIGHT - 4, self)
+        self.highlight_rect = QGraphicsRectItem(
+            2, 2, self.WIDTH - 4, self.HEIGHT - 4, self
+        )
         self.highlight_rect.setPen(QPen(QColor("#3d8bfd"), 1.5, Qt.DashLine))
         self.highlight_rect.setBrush(QBrush(Qt.NoBrush))
         self.highlight_rect.setVisible(False)
@@ -377,7 +400,9 @@ class NodeItem(QGraphicsRectItem):
 
     def set_display_name(self, display_name: str) -> None:
         self.name_item.setText(display_name)
-        self.name_item.setPos((self.WIDTH - self.name_item.boundingRect().width()) / 2, 74)
+        self.name_item.setPos(
+            (self.WIDTH - self.name_item.boundingRect().width()) / 2, 74
+        )
 
     def itemChange(self, change, value):  # noqa: N802
         if change == QGraphicsItem.ItemPositionHasChanged:
@@ -540,10 +565,14 @@ class TopologyScene(QGraphicsScene):
         gap = 10.0
 
         if abs(dx) >= abs(dy):
-            x = other.pos().x() + (NodeItem.WIDTH + gap if dx >= 0 else -(NodeItem.WIDTH + gap))
+            x = other.pos().x() + (
+                NodeItem.WIDTH + gap if dx >= 0 else -(NodeItem.WIDTH + gap)
+            )
             return QPointF(x, node.pos().y())
 
-        y = other.pos().y() + (NodeItem.HEIGHT + gap if dy >= 0 else -(NodeItem.HEIGHT + gap))
+        y = other.pos().y() + (
+            NodeItem.HEIGHT + gap if dy >= 0 else -(NodeItem.HEIGHT + gap)
+        )
         return QPointF(node.pos().x(), y)
 
     def _finish_port_drag(self, target_port: PortItem | None) -> None:
@@ -590,9 +619,13 @@ class TopologyScene(QGraphicsScene):
             if key.lower() == name_lower:
                 return TopologyScene._copy_params(v)
         if "txdsp" in name_lower:
-            return TopologyScene._copy_params(DEFAULT_COMPONENT_PARAMS.get("OLTTxDSP", {}))
+            return TopologyScene._copy_params(
+                DEFAULT_COMPONENT_PARAMS.get("OLTTxDSP", {})
+            )
         if "rxdsp" in name_lower:
-            return TopologyScene._copy_params(DEFAULT_COMPONENT_PARAMS.get("ONURxDSP", {}))
+            return TopologyScene._copy_params(
+                DEFAULT_COMPONENT_PARAMS.get("ONURxDSP", {})
+            )
         for key, v in DEFAULT_COMPONENT_PARAMS.items():
             if key.lower() in name_lower:
                 return TopologyScene._copy_params(v)
@@ -603,12 +636,16 @@ class TopologyScene(QGraphicsScene):
         return {k: list(v) for k, v in params.items()}
 
     @staticmethod
-    def _merge_with_default_params(name: str, params: dict | None) -> dict[str, list[str]]:
+    def _merge_with_default_params(
+        name: str, params: dict | None
+    ) -> dict[str, list[str]]:
         merged = TopologyScene._default_params(name)
         for key, value in (params or {}).items():
             if key in DEPRECATED_SCAN_PARAMS:
                 continue
-            merged[key] = list(value) if isinstance(value, list) else [str(value), "", ""]
+            merged[key] = (
+                list(value) if isinstance(value, list) else [str(value), "", ""]
+            )
         return merged
 
     def selected_nodes(self) -> list[NodeItem]:
@@ -660,7 +697,11 @@ class TopologyScene(QGraphicsScene):
                         "target_side": item.target.side,
                     }
                 )
-        return {"nodes": nodes, "edges": edges, "parameter_sweeps": list(self.sweep_config)}
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "parameter_sweeps": list(self.sweep_config),
+        }
 
     def deserialize(self, data: dict) -> None:
         self.clear()
@@ -712,13 +753,17 @@ class TopologyScene(QGraphicsScene):
             name = node_data.get("name", f"Node{node_id}")
             icon_path = resolve_icon_path(name, node_data.get("icon_path", ""))
             params = self._merge_with_default_params(name, node_data.get("params"))
-            node = NodeItem(node_id, ComponentMeta(name=name, icon_path=icon_path, params=params))
+            node = NodeItem(
+                node_id, ComponentMeta(name=name, icon_path=icon_path, params=params)
+            )
 
             if has_xy:
                 x = float(node_data["x"])
                 y = float(node_data["y"])
             else:
-                x, y = layered_pos.get(node_id, (120.0 + (idx % 6) * 150.0, 120.0 + (idx // 6) * 130.0))
+                x, y = layered_pos.get(
+                    node_id, (120.0 + (idx % 6) * 150.0, 120.0 + (idx // 6) * 130.0)
+                )
 
             node.setPos(QPointF(x, y))
             self.addItem(node)
@@ -818,7 +863,8 @@ class WorkspaceView(QGraphicsView):
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
         if event.key() == Qt.Key_Delete or (
-            event.key() == Qt.Key_Backspace and event.modifiers() & (Qt.ControlModifier | Qt.MetaModifier)
+            event.key() == Qt.Key_Backspace
+            and event.modifiers() & (Qt.ControlModifier | Qt.MetaModifier)
         ):
             self.delete_requested.emit()
             event.accept()
@@ -921,7 +967,11 @@ class WorkspacePanel(QWidget):
 
     def _edit_node_parameters(self, node: NodeItem) -> None:
         normalized = "".join(ch.lower() for ch in node.meta.name if ch.isalnum())
-        if "oanalyzer" in normalized or "eanalyzer" in normalized or "powermeter" in normalized:
+        if (
+            "oanalyzer" in normalized
+            or "eanalyzer" in normalized
+            or "powermeter" in normalized
+        ):
             self.analyzer_open_requested.emit(node.node_id, node.meta.name)
             return
 
@@ -988,9 +1038,15 @@ class WorkspacePanel(QWidget):
         center = self.view.mapToScene(self.view.viewport().rect().center())
         id_map: dict[int, NodeItem] = {}
         for node_data in self._clipboard_nodes:
-            pos = QPointF(center.x() + node_data["dx"] + 25, center.y() + node_data["dy"] + 25)
-            node = self.scene.create_node(node_data["name"], node_data["icon_path"], pos)
-            node.meta.params = self.scene._merge_with_default_params(node.meta.name, node_data.get("params", {}))
+            pos = QPointF(
+                center.x() + node_data["dx"] + 25, center.y() + node_data["dy"] + 25
+            )
+            node = self.scene.create_node(
+                node_data["name"], node_data["icon_path"], pos
+            )
+            node.meta.params = self.scene._merge_with_default_params(
+                node.meta.name, node_data.get("params", {})
+            )
             node.setSelected(True)
             if "id" in node_data:
                 id_map[int(node_data["id"])] = node
@@ -1000,8 +1056,12 @@ class WorkspacePanel(QWidget):
             tgt_node = id_map.get(int(edge_data["target_id"]))
             if not src_node or not tgt_node:
                 continue
-            src_port = self.scene._get_port(src_node, edge_data.get("source_side", "right"))
-            tgt_port = self.scene._get_port(tgt_node, edge_data.get("target_side", "left"))
+            src_port = self.scene._get_port(
+                src_node, edge_data.get("source_side", "right")
+            )
+            tgt_port = self.scene._get_port(
+                tgt_node, edge_data.get("target_side", "left")
+            )
             edge = EdgeItem(src_port, tgt_port)
             self.scene.addItem(edge)
             src_node.edges.append(edge)

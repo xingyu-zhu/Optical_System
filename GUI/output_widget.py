@@ -5,9 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from PyQt5.QtCore import QThread, Qt, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFontDatabase, QTextCharFormat, QTextCursor
-from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from matlab_engine_manager import MatlabEngineManager
 
@@ -124,7 +133,9 @@ class OutputWidget(QWidget):
     def append_message(self, message: str, source: str = "INFO") -> None:
         source_upper = source.upper()
         time_text = datetime.now().strftime("%H:%M:%S") if self.show_timestamp else ""
-        prefix = f"[{time_text}] [{source_upper}] " if time_text else f"[{source_upper}] "
+        prefix = (
+            f"[{time_text}] [{source_upper}] " if time_text else f"[{source_upper}] "
+        )
 
         fmt = QTextCharFormat()
         fmt.setForeground(self._source_color(source_upper))
@@ -222,7 +233,9 @@ class OutputWidget(QWidget):
         self.engine_status_changed.emit("Disconnected")
 
     def _on_disconnect_failed(self, error_text: str) -> None:
-        self.append_message(f"Failed to disconnect MATLAB: {error_text}", source="ERROR")
+        self.append_message(
+            f"Failed to disconnect MATLAB: {error_text}", source="ERROR"
+        )
         self.engine_status_changed.emit("Disconnect Error")
 
     def _on_disconnect_finished(self) -> None:

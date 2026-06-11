@@ -1,0 +1,1132 @@
+{
+  "nodes": [
+    {
+      "id": 30,
+      "name": "O-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 1788.425756250294,
+      "y": 1380.2334544375983,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "name": "Combiner",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/combiner.jpg",
+      "x": 1790.648620229532,
+      "y": 1176.4857192770992,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "name": "Modulator",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
+      "x": 508.2782500000005,
+      "y": 1672.37024375,
+      "params": {
+        "Vpi": [
+          "3",
+          "V",
+          "半波电压"
+        ],
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "调制器电带宽"
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "name": "DAC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
+      "x": 363.5093687500002,
+      "y": 1524.6132875,
+      "params": {
+        "ElectricalBandwidth": [
+          "32",
+          "GHz",
+          "电带宽"
+        ],
+        "Resolution": [
+          "8",
+          "bit",
+          "量化位数"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "name": "ONUTxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
+      "x": 186.01135625000026,
+      "y": 1524.36229375,
+      "params": {
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "BaudRate": [
+          "25",
+          "GBaud",
+          "上行 burst 波特率"
+        ],
+        "Modulation": [
+          "QPSK",
+          "",
+          "调制格式"
+        ],
+        "SymbolNumber": [
+          "32768",
+          "",
+          "符号数"
+        ],
+        "NumBands": [
+          "Auto",
+          "",
+          "ONU数（由ONUTxDSP数量统计）"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "name": "LaserCW",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
+      "x": 365.2703000000002,
+      "y": 1672.3702437500008,
+      "params": {
+        "Power": [
+          "13",
+          "dBm",
+          "平均输出光功率"
+        ],
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "激光线宽"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "name": "Driver",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
+      "x": 508.78023750000045,
+      "y": 1525.8682562500003,
+      "params": {
+        "Gain": [
+          "2",
+          "dB",
+          "驱动器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "name": "Modulator",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
+      "x": 505.0232812500004,
+      "y": 1337.4020437500003,
+      "params": {
+        "Vpi": [
+          "3",
+          "V",
+          "半波电压"
+        ],
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "调制器电带宽"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "name": "DAC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
+      "x": 351.0034062500003,
+      "y": 1185.39011875,
+      "params": {
+        "ElectricalBandwidth": [
+          "32",
+          "GHz",
+          "电带宽"
+        ],
+        "Resolution": [
+          "8",
+          "bit",
+          "量化位数"
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "name": "ONUTxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
+      "x": 171.7563875000003,
+      "y": 1185.1391250000004,
+      "params": {
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "BaudRate": [
+          "25",
+          "GBaud",
+          "上行 burst 波特率"
+        ],
+        "Modulation": [
+          "QPSK",
+          "",
+          "调制格式"
+        ],
+        "SymbolNumber": [
+          "32768",
+          "",
+          "符号数"
+        ],
+        "NumBands": [
+          "Auto",
+          "",
+          "ONU数（由ONUTxDSP数量统计）"
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "name": "LaserCW",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
+      "x": 348.0232812500003,
+      "y": 1337.4020437500003,
+      "params": {
+        "Power": [
+          "13",
+          "dBm",
+          "平均输出光功率"
+        ],
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "激光线宽"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "name": "Driver",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
+      "x": 505.01930625000045,
+      "y": 1184.8960812500002,
+      "params": {
+        "Gain": [
+          "2",
+          "dB",
+          "驱动器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 18,
+      "name": "Modulator",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
+      "x": 502.3259500000006,
+      "y": 1047.1709250000006,
+      "params": {
+        "Vpi": [
+          "3",
+          "V",
+          "半波电压"
+        ],
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "调制器电带宽"
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "name": "DAC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
+      "x": 340.0670062500005,
+      "y": 894.1669500000003,
+      "params": {
+        "ElectricalBandwidth": [
+          "32",
+          "GHz",
+          "电带宽"
+        ],
+        "Resolution": [
+          "8",
+          "bit",
+          "量化位数"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "name": "ONUTxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
+      "x": 162.56899375000032,
+      "y": 895.6649625000005,
+      "params": {
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "BaudRate": [
+          "25",
+          "GBaud",
+          "上行 burst 波特率"
+        ],
+        "Modulation": [
+          "QPSK",
+          "",
+          "调制格式"
+        ],
+        "SymbolNumber": [
+          "32768",
+          "",
+          "符号数"
+        ],
+        "NumBands": [
+          "Auto",
+          "",
+          "ONU数（由ONUTxDSP数量统计）"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "name": "LaserCW",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
+      "x": 348.8239625000005,
+      "y": 1047.1709250000004,
+      "params": {
+        "Power": [
+          "13",
+          "dBm",
+          "平均输出光功率"
+        ],
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "激光线宽"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "name": "Driver",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
+      "x": 502.8279375000006,
+      "y": 893.6729125000005,
+      "params": {
+        "Gain": [
+          "2",
+          "dB",
+          "驱动器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 1,
+      "name": "ONUTxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Tx_DSP.png",
+      "x": 150.56104375000027,
+      "y": 577.94378125,
+      "params": {
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "BaudRate": [
+          "25",
+          "GBaud",
+          "上行 burst 波特率"
+        ],
+        "Modulation": [
+          "QPSK",
+          "",
+          "调制格式"
+        ],
+        "SymbolNumber": [
+          "32768",
+          "",
+          "符号数"
+        ],
+        "NumBands": [
+          "Auto",
+          "",
+          "ONU数（由ONUTxDSP数量统计）"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "name": "DAC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/DAC.jpg",
+      "x": 321.0630312500003,
+      "y": 578.194775,
+      "params": {
+        "ElectricalBandwidth": [
+          "32",
+          "GHz",
+          "电带宽"
+        ],
+        "Resolution": [
+          "8",
+          "bit",
+          "量化位数"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "name": "Driver",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Driver.jpg",
+      "x": 497.8160125000005,
+      "y": 577.7007375000002,
+      "params": {
+        "Gain": [
+          "2",
+          "dB",
+          "驱动器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "name": "Modulator",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/modulator.jpg",
+      "x": 499.06303125000045,
+      "y": 727.7007375000001,
+      "params": {
+        "Vpi": [
+          "3",
+          "V",
+          "半波电压"
+        ],
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "调制器电带宽"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "name": "LaserCW",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/laser.png",
+      "x": 342.0630312500005,
+      "y": 727.7007375000002,
+      "params": {
+        "Power": [
+          "13",
+          "dBm",
+          "平均输出光功率"
+        ],
+        "TransmitFrequency": [
+          "193.1",
+          "THz",
+          "发射频率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "激光线宽"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "name": "Fiber",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/fiber.jpg",
+      "x": 1989.5597893416912,
+      "y": 1177.135770567372,
+      "params": {
+        "Length": [
+          "20",
+          "km",
+          "光纤长度"
+        ],
+        "Attenuation": [
+          "0.2",
+          "dB/km",
+          "插损/衰减系数"
+        ],
+        "Dispersion": [
+          "16.7",
+          "ps/nm/km",
+          "色散参数"
+        ],
+        "Nonlinearity": [
+          "1.3",
+          "1/W/km",
+          "非线性系数"
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 683.46839404384,
+      "y": 724.4713337830192,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "name": "ICR",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ICR.png",
+      "x": 2434.4487830570315,
+      "y": 1175.316130119531,
+      "params": {
+        "Bandwidth": [
+          "25",
+          "GHz",
+          "接收机带宽"
+        ],
+        "Responsivity": [
+          "0.6",
+          "A/W",
+          "探测器响应度"
+        ],
+        "ThermalNoise": [
+          "True",
+          "",
+          "启用热噪声"
+        ],
+        "ShotNoise": [
+          "True",
+          "",
+          "启用散粒噪声"
+        ],
+        "DarkCurrent": [
+          "10",
+          "nA",
+          "暗电流"
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "name": "TIA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/TIA.jpg",
+      "x": 2586.691826807032,
+      "y": 1174.8141426195302,
+      "params": {
+        "Bandwidth": [
+          "35",
+          "GHz",
+          "TIA 带宽"
+        ],
+        "Gain": [
+          "2000",
+          "Ohm",
+          "跨阻增益"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "name": "LO",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/LO.png",
+      "x": 2435.1977893070316,
+      "y": 1018.5671238695309,
+      "params": {
+        "Power": [
+          "13",
+          "dBm",
+          "本振光功率"
+        ],
+        "Linewidth": [
+          "100",
+          "kHz",
+          "本振线宽"
+        ],
+        "FreqOffset": [
+          "0.5",
+          "GHz",
+          "本振频偏"
+        ],
+        "Phase": [
+          "0",
+          "deg",
+          "初始相位"
+        ],
+        "RIN": [
+          "-150",
+          "dB/Hz",
+          "相对强度噪声"
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "name": "ADC",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/ADC.jpg",
+      "x": 2741.6918268070312,
+      "y": 1176.0651363695301,
+      "params": {
+        "Bandwidth": [
+          "59",
+          "GHz",
+          "ADC 模拟带宽"
+        ],
+        "Resolution": [
+          "10",
+          "bit",
+          "量化位数"
+        ],
+        "SamplingRate": [
+          "256",
+          "GSa/s",
+          "采样率"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "name": "OLTRxDSP",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Rx_DSP.png",
+      "x": 2904.942820557032,
+      "y": 1176.065136369531,
+      "params": {
+        "Modulation": [
+          "QPSK",
+          "",
+          "调制格式"
+        ],
+        "CD_Compensation": [
+          "True",
+          "",
+          "色散补偿"
+        ],
+        "Adaptive_EQ": [
+          "True",
+          "",
+          "自适应均衡"
+        ],
+        "TargetONU": [
+          "Auto",
+          "",
+          "上行目标 ONU 时隙"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 3085.691826807032,
+      "y": 1176.065136369531,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "name": "VOA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/VOA.jpg",
+      "x": 2199.038435183515,
+      "y": 1181.8468328922647,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "VOA的输出功率"
+        ],
+        "Attenuation": [
+          "0",
+          "dB",
+          "衰减量"
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 691.1615004999999,
+      "y": 1045.0597976406243,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 705.0398650937498,
+      "y": 1336.5054541093743,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "name": "OA",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/OA.jpg",
+      "x": 718.9182296874995,
+      "y": 1671.8992651249982,
+      "params": {
+        "Mode": [
+          "OutputPower",
+          "",
+          "工作模式"
+        ],
+        "OutputPower": [
+          "0",
+          "dBm",
+          "EDFA 输出功率"
+        ],
+        "Gain": [
+          "0",
+          "dB",
+          "光放大器增益"
+        ],
+        "NF": [
+          "4",
+          "dB",
+          "噪声系数"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "name": "E-Analyzer",
+      "icon_path": "/Users/raymond/Desktop/Optical_System/GUI/icon/Analyzer.png",
+      "x": 2436.5782105093726,
+      "y": 1353.9501191585928,
+      "params": {
+        "Enabled": [
+          "True",
+          "",
+          "是否启用"
+        ],
+        "Comment": [
+          "",
+          "",
+          "备注"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source_id": 25,
+      "source_side": "right",
+      "target_id": 28,
+      "target_side": "left"
+    },
+    {
+      "source_id": 24,
+      "source_side": "bottom",
+      "target_id": 28,
+      "target_side": "top"
+    },
+    {
+      "source_id": 27,
+      "source_side": "right",
+      "target_id": 24,
+      "target_side": "left"
+    },
+    {
+      "source_id": 26,
+      "source_side": "right",
+      "target_id": 27,
+      "target_side": "left"
+    },
+    {
+      "source_id": 19,
+      "source_side": "bottom",
+      "target_id": 23,
+      "target_side": "top"
+    },
+    {
+      "source_id": 22,
+      "source_side": "right",
+      "target_id": 19,
+      "target_side": "left"
+    },
+    {
+      "source_id": 21,
+      "source_side": "right",
+      "target_id": 22,
+      "target_side": "left"
+    },
+    {
+      "source_id": 20,
+      "source_side": "right",
+      "target_id": 23,
+      "target_side": "left"
+    },
+    {
+      "source_id": 15,
+      "source_side": "right",
+      "target_id": 18,
+      "target_side": "left"
+    },
+    {
+      "source_id": 14,
+      "source_side": "bottom",
+      "target_id": 18,
+      "target_side": "top"
+    },
+    {
+      "source_id": 17,
+      "source_side": "right",
+      "target_id": 14,
+      "target_side": "left"
+    },
+    {
+      "source_id": 16,
+      "source_side": "right",
+      "target_id": 17,
+      "target_side": "left"
+    },
+    {
+      "source_id": 1,
+      "source_side": "right",
+      "target_id": 2,
+      "target_side": "left"
+    },
+    {
+      "source_id": 2,
+      "source_side": "right",
+      "target_id": 3,
+      "target_side": "left"
+    },
+    {
+      "source_id": 5,
+      "source_side": "right",
+      "target_id": 4,
+      "target_side": "left"
+    },
+    {
+      "source_id": 3,
+      "source_side": "bottom",
+      "target_id": 4,
+      "target_side": "top"
+    },
+    {
+      "source_id": 10,
+      "source_side": "bottom",
+      "target_id": 8,
+      "target_side": "top"
+    },
+    {
+      "source_id": 8,
+      "source_side": "right",
+      "target_id": 9,
+      "target_side": "left"
+    },
+    {
+      "source_id": 9,
+      "source_side": "right",
+      "target_id": 11,
+      "target_side": "left"
+    },
+    {
+      "source_id": 11,
+      "source_side": "right",
+      "target_id": 12,
+      "target_side": "left"
+    },
+    {
+      "source_id": 12,
+      "source_side": "right",
+      "target_id": 13,
+      "target_side": "left"
+    },
+    {
+      "source_id": 29,
+      "source_side": "bottom",
+      "target_id": 30,
+      "target_side": "top"
+    },
+    {
+      "source_id": 6,
+      "source_side": "right",
+      "target_id": 31,
+      "target_side": "left"
+    },
+    {
+      "source_id": 31,
+      "source_side": "right",
+      "target_id": 8,
+      "target_side": "left"
+    },
+    {
+      "source_id": 29,
+      "source_side": "right",
+      "target_id": 6,
+      "target_side": "left"
+    },
+    {
+      "source_id": 28,
+      "source_side": "right",
+      "target_id": 34,
+      "target_side": "left"
+    },
+    {
+      "source_id": 34,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 23,
+      "source_side": "right",
+      "target_id": 33,
+      "target_side": "left"
+    },
+    {
+      "source_id": 33,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 18,
+      "source_side": "right",
+      "target_id": 32,
+      "target_side": "left"
+    },
+    {
+      "source_id": 32,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 4,
+      "source_side": "right",
+      "target_id": 7,
+      "target_side": "left"
+    },
+    {
+      "source_id": 7,
+      "source_side": "right",
+      "target_id": 29,
+      "target_side": "left"
+    },
+    {
+      "source_id": 8,
+      "source_side": "bottom",
+      "target_id": 35,
+      "target_side": "top"
+    }
+  ],
+  "parameter_sweeps": [
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 7,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 32,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 33,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 1,
+      "node_id": 34,
+      "component": "OA",
+      "parameter": "OutputPower",
+      "start": "8",
+      "stop": "13",
+      "step": "1",
+      "unit": "dBm"
+    },
+    {
+      "enabled": false,
+      "depth": 2,
+      "node_id": 31,
+      "component": "VOA",
+      "parameter": "OutputPower",
+      "start": "-35",
+      "stop": "-30",
+      "step": "1",
+      "unit": "dBm"
+    }
+  ]
+}

@@ -1,20 +1,25 @@
 """Dialogs for analyzer plots and simulation result summaries."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import Any
 
-_MPL_CACHE = Path(__file__).resolve().parent / ".matplotlib_cache"
-_MPL_CACHE.mkdir(exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CACHE))
-os.environ.setdefault("XDG_CACHE_HOME", str(_MPL_CACHE))
+from matplotlib_config import configure_matplotlib_cache
 
+configure_matplotlib_cache()
+
+from matplotlib import rcParams
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib import rcParams
-from PyQt5.QtWidgets import QDialog, QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QDialog,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+)
 
 from signal_plotter import (
     _as_array,
@@ -51,7 +56,9 @@ class AnalyzerPlotDialog(QDialog):
         layout.addWidget(self.tabs)
 
     @classmethod
-    def optical(cls, node_name: str, workspace: dict[str, Any], parent=None) -> "AnalyzerPlotDialog":
+    def optical(
+        cls, node_name: str, workspace: dict[str, Any], parent=None
+    ) -> "AnalyzerPlotDialog":
         dialog = cls(f"光分析仪 - {node_name}", parent)
         signal = workspace.get("AnalyzerSignal")
         fs = float_or_default(workspace.get("AnalyzerFs"), 92e9)
@@ -66,7 +73,9 @@ class AnalyzerPlotDialog(QDialog):
         return dialog
 
     @classmethod
-    def electrical(cls, node_name: str, workspace: dict[str, Any], parent=None) -> "AnalyzerPlotDialog":
+    def electrical(
+        cls, node_name: str, workspace: dict[str, Any], parent=None
+    ) -> "AnalyzerPlotDialog":
         label = workspace.get("AnalyzerSignalLabel", "Electrical Signal")
         dialog = cls(f"电分析仪 - {node_name}", parent)
         signal = workspace.get("AnalyzerSignal")
@@ -77,7 +86,9 @@ class AnalyzerPlotDialog(QDialog):
         spectrum_psd = workspace.get("AnalyzerSpectrumPSDdBHz")
         dialog._add_time_waveform(signal, fs, str(label), sample_step)
         dialog._add_constellation(constellation, str(label))
-        dialog._add_electrical_spectrum(signal, fs, str(label), spectrum_freq, spectrum_psd)
+        dialog._add_electrical_spectrum(
+            signal, fs, str(label), spectrum_freq, spectrum_psd
+        )
         return dialog
 
     def _add_canvas(self, title: str) -> tuple[Figure, Any]:
@@ -137,10 +148,14 @@ class AnalyzerPlotDialog(QDialog):
             draw_spectrum(ax, signal, fs, title=f"{label} Spectrum")
         canvas.draw()
 
-    def _add_time_waveform(self, signal: Any, fs: float, label: str, sample_step: float = 1.0) -> None:
+    def _add_time_waveform(
+        self, signal: Any, fs: float, label: str, sample_step: float = 1.0
+    ) -> None:
         fig, canvas = self._add_canvas("时域波形")
         ax = fig.add_subplot(111)
-        draw_time_waveform(ax, signal, fs=fs, sample_step=sample_step, title=f"{label} Time Waveform")
+        draw_time_waveform(
+            ax, signal, fs=fs, sample_step=sample_step, title=f"{label} Time Waveform"
+        )
         canvas.draw()
 
     def _add_constellation(self, signal: Any, label: str) -> None:
@@ -153,7 +168,12 @@ class AnalyzerPlotDialog(QDialog):
 class SimulationResultDialog(QDialog):
     """Table dialog for BER and SNR extracted from receiver DSP outputs."""
 
-    def __init__(self, rows: list[dict[str, Any]], sweep: dict[str, Any] | None = None, parent=None):
+    def __init__(
+        self,
+        rows: list[dict[str, Any]],
+        sweep: dict[str, Any] | None = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("仿真结果")
         self.resize(860, 560)
@@ -178,13 +198,21 @@ class SimulationResultDialog(QDialog):
 
         if rows:
             for row, item in enumerate(rows):
-                table.setItem(row, 0, QTableWidgetItem(str(item.get("display_node_id", item.get("node_id", "")))))
+                table.setItem(
+                    row,
+                    0,
+                    QTableWidgetItem(
+                        str(item.get("display_node_id", item.get("node_id", "")))
+                    ),
+                )
                 table.setItem(row, 1, QTableWidgetItem(str(item.get("name", ""))))
                 table.setItem(row, 2, QTableWidgetItem(scalar_text(item.get("SNR"))))
                 table.setItem(row, 3, QTableWidgetItem(scalar_text(item.get("BER"))))
         else:
             table.setItem(0, 0, QTableWidgetItem("-"))
-            table.setItem(0, 1, QTableWidgetItem("暂无 BER/SNR 结果，请先运行包含 RxDSP 的拓扑。"))
+            table.setItem(
+                0, 1, QTableWidgetItem("暂无 BER/SNR 结果，请先运行包含 RxDSP 的拓扑。")
+            )
             table.setItem(0, 2, QTableWidgetItem("-"))
             table.setItem(0, 3, QTableWidgetItem("-"))
 
@@ -210,7 +238,16 @@ class SimulationResultDialog(QDialog):
 
     def _add_sweep_tab(self, rows: list[dict[str, Any]]) -> None:
         table = QTableWidget(self)
-        headers = ["扫描点", "节点编号", "组件", "扫描参数", "发射功率(dBm)", "接收光功率(dBm)", "SNR", "BER"]
+        headers = [
+            "扫描点",
+            "节点编号",
+            "组件",
+            "扫描参数",
+            "发射功率(dBm)",
+            "接收光功率(dBm)",
+            "SNR",
+            "BER",
+        ]
         table.setColumnCount(len(headers))
         table.setHorizontalHeaderLabels(headers)
         table.horizontalHeader().setStretchLastSection(True)
@@ -221,7 +258,9 @@ class SimulationResultDialog(QDialog):
                 item.get("point_index", ""),
                 item.get("display_node_id", item.get("node_id", "")),
                 item.get("component", ""),
-                item.get("sweep_label", self._sweep_values_text(item.get("sweep_values"))),
+                item.get(
+                    "sweep_label", self._sweep_values_text(item.get("sweep_values"))
+                ),
                 scalar_text(item.get("tx_power_dbm")),
                 scalar_text(item.get("rop_dbm")),
                 scalar_text(item.get("SNR")),
@@ -232,11 +271,20 @@ class SimulationResultDialog(QDialog):
 
         self.tabs.addTab(table, "参数扫描")
 
-    def _add_budget_tab(self, budget_rows: list[dict[str, Any]], sweep_rows: list[dict[str, Any]]) -> None:
+    def _add_budget_tab(
+        self, budget_rows: list[dict[str, Any]], sweep_rows: list[dict[str, Any]]
+    ) -> None:
         tab = QTabWidget(self)
 
         budget_table = QTableWidget(self)
-        headers = ["发射功率(dBm)", "节点编号", "组件", "灵敏度(dBm)", "功率预算(dB)", "FEC门限"]
+        headers = [
+            "发射功率(dBm)",
+            "节点编号",
+            "组件",
+            "灵敏度(dBm)",
+            "功率预算(dB)",
+            "FEC门限",
+        ]
         budget_table.setColumnCount(len(headers))
         budget_table.setHorizontalHeaderLabels(headers)
         budget_table.horizontalHeader().setStretchLastSection(True)
@@ -254,7 +302,9 @@ class SimulationResultDialog(QDialog):
                 for col, value in enumerate(values):
                     budget_table.setItem(row_idx, col, QTableWidgetItem(str(value)))
         else:
-            budget_table.setItem(0, 0, QTableWidgetItem("需要同时配置发射功率扫描和接收光功率扫描。"))
+            budget_table.setItem(
+                0, 0, QTableWidgetItem("需要同时配置发射功率扫描和接收光功率扫描。")
+            )
         tab.addTab(budget_table, "数据")
 
         fig = Figure(figsize=(7.8, 4.6), tight_layout=True)
@@ -268,7 +318,11 @@ class SimulationResultDialog(QDialog):
             y_label="功率预算 (dB)",
         )
         if not plotted:
-            message = "BER 扫描点不足，无法插值功率预算" if budget_rows else "暂无功率预算数据"
+            message = (
+                "BER 扫描点不足，无法插值功率预算"
+                if budget_rows
+                else "暂无功率预算数据"
+            )
             ax.text(0.5, 0.5, message, ha="center", va="center", transform=ax.transAxes)
         ax.grid(True, alpha=0.25)
         canvas.draw()
@@ -285,8 +339,14 @@ class SimulationResultDialog(QDialog):
             y_label="接收机灵敏度 (dBm @ BER=1e-2)",
         )
         if not plotted_sens:
-            message = "BER 扫描点不足，无法插值接收机灵敏度" if budget_rows else "暂无接收机灵敏度数据"
-            ax_sens.text(0.5, 0.5, message, ha="center", va="center", transform=ax_sens.transAxes)
+            message = (
+                "BER 扫描点不足，无法插值接收机灵敏度"
+                if budget_rows
+                else "暂无接收机灵敏度数据"
+            )
+            ax_sens.text(
+                0.5, 0.5, message, ha="center", va="center", transform=ax_sens.transAxes
+            )
         ax_sens.grid(True, alpha=0.25)
         canvas_sens.draw()
         tab.addTab(canvas_sens, "接收机灵敏度")
@@ -301,24 +361,40 @@ class SimulationResultDialog(QDialog):
                 continue
             key = (str(row.get("component", "Receiver")), row.get("tx_power_dbm"))
             grouped.setdefault(key, []).append(row)
-        for (component, tx_power), group in sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1] is None, item[0][1])):
+        for (component, tx_power), group in sorted(
+            grouped.items(),
+            key=lambda item: (item[0][0], item[0][1] is None, item[0][1]),
+        ):
             group = sorted(group, key=lambda item: float(item["rop_dbm"]))
             x = [float(item["rop_dbm"]) for item in group]
             y = [max(float(item["BER"]), 1e-12) for item in group]
             if x and y:
-                tx_label = f", Tx={scalar_text(tx_power)} dBm" if tx_power is not None else ""
-                line = ax2.plot(x, y, linewidth=1.4, alpha=0.7, label=f"{component}{tx_label}")[0]
+                tx_label = (
+                    f", Tx={scalar_text(tx_power)} dBm" if tx_power is not None else ""
+                )
+                line = ax2.plot(
+                    x, y, linewidth=1.4, alpha=0.7, label=f"{component}{tx_label}"
+                )[0]
                 ax2.scatter(x, y, s=38, alpha=0.9, color=line.get_color())
                 plotted = True
         if plotted:
             ax2.set_yscale("log")
-            ax2.axhline(1e-2, color="0.25", linestyle="--", linewidth=1.0, label="FEC=1e-2")
+            ax2.axhline(
+                1e-2, color="0.25", linestyle="--", linewidth=1.0, label="FEC=1e-2"
+            )
             ax2.set_title("BER vs 接收光功率")
             ax2.set_xlabel("接收光功率 (dBm)")
             ax2.set_ylabel("BER")
             ax2.legend(loc="best", fontsize=8)
         else:
-            ax2.text(0.5, 0.5, "暂无 BER/ROP 扫描曲线", ha="center", va="center", transform=ax2.transAxes)
+            ax2.text(
+                0.5,
+                0.5,
+                "暂无 BER/ROP 扫描曲线",
+                ha="center",
+                va="center",
+                transform=ax2.transAxes,
+            )
         ax2.grid(True, alpha=0.25)
         canvas2.draw()
         tab.addTab(canvas2, "BER曲线")
@@ -326,7 +402,9 @@ class SimulationResultDialog(QDialog):
         self.tabs.addTab(tab, "功率预算")
 
     @staticmethod
-    def _scatter_budget_metric(ax, budget_rows: list[dict[str, Any]], y_key: str, title: str, y_label: str) -> bool:
+    def _scatter_budget_metric(
+        ax, budget_rows: list[dict[str, Any]], y_key: str, title: str, y_label: str
+    ) -> bool:
         grouped: dict[str, list[dict[str, Any]]] = {}
         for item in budget_rows:
             if item.get("tx_power_dbm") is None or item.get(y_key) is None:

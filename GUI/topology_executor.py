@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict, deque
 from dataclasses import dataclass
-import json
 from pathlib import Path
 from typing import Any
 
@@ -105,7 +105,9 @@ class TopologyExecutor:
             levels.append(level)
 
         if visited != len(self.nodes):
-            raise TopologyCycleError("Cycle detected in topology; cannot topologically schedule")
+            raise TopologyCycleError(
+                "Cycle detected in topology; cannot topologically schedule"
+            )
 
         return levels
 
@@ -154,7 +156,9 @@ class TopologyExecutor:
 
                 outputs = component_runner(node, node_inputs) or {}
                 if not isinstance(outputs, dict):
-                    raise TypeError(f"Runner must return dict, got {type(outputs)} for node {node_id}")
+                    raise TypeError(
+                        f"Runner must return dict, got {type(outputs)} for node {node_id}"
+                    )
                 outputs_by_node[node_id] = outputs
 
                 # Route outputs to downstream targets by matching edge source/target sides.
@@ -165,10 +169,14 @@ class TopologyExecutor:
                     if e.source_side not in outputs:
                         # Allow generic fallback when component returns one primary output.
                         if "default" in outputs:
-                            target_port = self._available_input_port(routed_inputs[e.target_id], e.target_side)
+                            target_port = self._available_input_port(
+                                routed_inputs[e.target_id], e.target_side
+                            )
                             routed_inputs[e.target_id][target_port] = outputs["default"]
                         continue
-                    target_port = self._available_input_port(routed_inputs[e.target_id], e.target_side)
+                    target_port = self._available_input_port(
+                        routed_inputs[e.target_id], e.target_side
+                    )
                     routed_inputs[e.target_id][target_port] = outputs[e.source_side]
 
         return outputs_by_node
@@ -188,7 +196,9 @@ class TopologyExecutor:
 def demo_runner(node: Node, inputs_by_port: dict[str, Any]) -> dict[str, Any]:
     """Simple demo runner for dry-run validation without MATLAB."""
     print(f"Running node {node.node_id}: {node.name}")
-    print(f"  Inputs: {sorted(k for k in inputs_by_port.keys() if not k.startswith('__'))}")
+    print(
+        f"  Inputs: {sorted(k for k in inputs_by_port.keys() if not k.startswith('__'))}"
+    )
     return {"default": f"signal_from_{node.name}"}
 
 
@@ -197,7 +207,9 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Topology execution planner")
     parser.add_argument("topology_json", help="Path to topology json file")
-    parser.add_argument("--dry-run", action="store_true", help="Execute using demo runner")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Execute using demo runner"
+    )
     args = parser.parse_args()
 
     executor = TopologyExecutor.from_json_file(args.topology_json)

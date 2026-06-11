@@ -23,6 +23,6 @@ pyinstaller `
   --hidden-import matlab.engine `
   --hidden-import matlabengineforpython3_10 `
   --hidden-import matplotlib.backends.backend_qt5agg `
-  --add-data "PON;PON" `
+  --add-data "..\PON;PON" `
   --add-data "icon;icon" `
   run_gui.py

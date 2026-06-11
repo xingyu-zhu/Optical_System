@@ -1,2 +1,0 @@
-DEMO_model_down.m : 主程序
-component 文件夹: model

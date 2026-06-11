@@ -5,17 +5,17 @@ used from scripts, from MATLAB topology outputs converted to Python objects, or
 later embedded into a PyQt matplotlib canvas.
 """
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import numpy as np
 
-_MPL_CACHE = Path(__file__).resolve().parent / ".matplotlib_cache"
-_MPL_CACHE.mkdir(exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CACHE))
-os.environ.setdefault("XDG_CACHE_HOME", str(_MPL_CACHE))
+from matplotlib_config import configure_matplotlib_cache
+
+configure_matplotlib_cache()
 
 from matplotlib import pyplot as plt
 
@@ -51,7 +51,9 @@ def _polarization_label(channel_index: int) -> str:
     return f"Ch{channel_index + 1}"
 
 
-def _full_frame_preview_indices(data: np.ndarray, max_samples: int | None) -> np.ndarray:
+def _full_frame_preview_indices(
+    data: np.ndarray, max_samples: int | None
+) -> np.ndarray:
     """Select preview samples across the whole frame, preserving burst peaks."""
     length = data.shape[0]
     if max_samples is None or length <= max_samples:
@@ -115,13 +117,25 @@ def draw_spectrum(ax, signal, fs: float, title: str = "Electrical Spectrum") -> 
     n = data.shape[0]
     if n == 0:
         ax.set_title(title)
-        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No signal available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_axis_off()
         return
     freq = _frequency_axis(n, fs)
     for ch in range(data.shape[1]):
         spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(freq / 1e9, _db_power(spectrum), linewidth=1.0, label=_polarization_label(ch))
+        ax.plot(
+            freq / 1e9,
+            _db_power(spectrum),
+            linewidth=1.0,
+            label=_polarization_label(ch),
+        )
 
     ax.set_title(title)
     ax.set_xlabel("Frequency (GHz)")
@@ -143,17 +157,37 @@ def draw_optical_spectrum(
     n = data.shape[0]
     if n == 0:
         ax.set_title(title)
-        ax.text(0.5, 0.5, "No optical signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No optical signal available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_axis_off()
         return
     freq_offset = _frequency_axis(n, fs)
-    x = freq_offset if center_frequency_hz is None else center_frequency_hz + freq_offset
-    x_label = "Frequency Offset (GHz)" if center_frequency_hz is None else "Optical Frequency (THz)"
+    x = (
+        freq_offset
+        if center_frequency_hz is None
+        else center_frequency_hz + freq_offset
+    )
+    x_label = (
+        "Frequency Offset (GHz)"
+        if center_frequency_hz is None
+        else "Optical Frequency (THz)"
+    )
     x_scale = 1e9 if center_frequency_hz is None else 1e12
 
     for ch in range(data.shape[1]):
         spectrum = np.fft.fftshift(np.fft.fft(data[:, ch]))
-        ax.plot(x / x_scale, _db_power(spectrum), linewidth=1.0, label=_polarization_label(ch))
+        ax.plot(
+            x / x_scale,
+            _db_power(spectrum),
+            linewidth=1.0,
+            label=_polarization_label(ch),
+        )
 
     ax.set_title(title)
     ax.set_xlabel(x_label)
@@ -174,7 +208,14 @@ def draw_constellation(
     data = _as_channels(symbols)
     if data.shape[0] == 0:
         ax.set_title(title)
-        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No signal available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_axis_off()
         return
     for ch in range(data.shape[1]):
@@ -220,14 +261,25 @@ def draw_time_waveform(
     data = _as_channels(signal)
     if data.shape[0] == 0:
         ax.set_title(title)
-        ax.text(0.5, 0.5, "No signal available", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No signal available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_axis_off()
         return
     preview_indices = _full_frame_preview_indices(data, max_samples)
     data = data[preview_indices, :]
 
     effective_step = max(float(sample_step or 1.0), 1.0)
-    x = preview_indices * effective_step if fs is None else preview_indices * effective_step / fs * 1e9
+    x = (
+        preview_indices * effective_step
+        if fs is None
+        else preview_indices * effective_step / fs * 1e9
+    )
     x_label = "Sample" if fs is None else "Time (ns)"
 
     for ch in range(data.shape[1]):
@@ -235,7 +287,9 @@ def draw_time_waveform(
         pol_label = _polarization_label(ch)
         ax.plot(x, np.real(y), linewidth=1.0, label=f"{pol_label} real")
         if np.iscomplexobj(y):
-            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag")
+            ax.plot(
+                x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag"
+            )
 
     ax.set_title(title)
     ax.set_xlabel(x_label)
@@ -270,7 +324,11 @@ def plot_time_waveform(
     data = data[preview_indices, :]
 
     effective_step = max(float(sample_step or 1.0), 1.0)
-    x = preview_indices * effective_step if fs is None else preview_indices * effective_step / fs
+    x = (
+        preview_indices * effective_step
+        if fs is None
+        else preview_indices * effective_step / fs
+    )
     x_label = "Sample" if fs is None else "Time (s)"
 
     fig, ax = plt.subplots(figsize=(8.5, 3.8))
@@ -279,7 +337,9 @@ def plot_time_waveform(
         pol_label = _polarization_label(ch)
         ax.plot(x, np.real(y), linewidth=1.0, label=f"{pol_label} real")
         if np.iscomplexobj(y):
-            ax.plot(x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag")
+            ax.plot(
+                x, np.imag(y), linewidth=0.9, linestyle="--", label=f"{pol_label} imag"
+            )
 
     ax.set_title(title)
     ax.set_xlabel(x_label)
@@ -312,7 +372,9 @@ def plot_optical_spectrum(
 ):
     """Plot optical spectrum using frequency offset or absolute optical frequency."""
     fig, ax = plt.subplots(figsize=(8.5, 3.8))
-    draw_optical_spectrum(ax, optical_field, fs, center_frequency_hz=center_frequency_hz, title=title)
+    draw_optical_spectrum(
+        ax, optical_field, fs, center_frequency_hz=center_frequency_hz, title=title
+    )
     return _finalize(fig, save_path, show)
 
 
@@ -326,7 +388,9 @@ def plot_constellation(
 ):
     """Plot I/Q constellation for complex symbols or waveform samples."""
     fig, ax = plt.subplots(figsize=(4.8, 4.8))
-    draw_constellation(ax, symbols, max_points=max_points, normalize=normalize, title=title)
+    draw_constellation(
+        ax, symbols, max_points=max_points, normalize=normalize, title=title
+    )
     return _finalize(fig, save_path, show)
 
 
@@ -347,7 +411,9 @@ def plot_eye_diagram(
     fig, ax = plt.subplots(figsize=(6.2, 3.8))
     for k in range(count):
         start = k * samples_per_symbol
-        ax.plot(x, data[start : start + span], color="#1f77b4", alpha=0.15, linewidth=0.8)
+        ax.plot(
+            x, data[start : start + span], color="#1f77b4", alpha=0.15, linewidth=0.8
+        )
 
     ax.set_title(title)
     ax.set_xlabel("Symbol Period")
@@ -397,7 +463,9 @@ if __name__ == "__main__":
     fs_demo = 64e9
     sig_demo = _demo_signal(fs_demo)
     out_dir = Path(__file__).resolve().parent / "plot_results"
-    paths = save_standard_signal_plots(sig_demo, fs_demo, out_dir, name="demo_optical", optical=True)
+    paths = save_standard_signal_plots(
+        sig_demo, fs_demo, out_dir, name="demo_optical", optical=True
+    )
     print("Generated plots:")
     for path in paths:
         print(path)

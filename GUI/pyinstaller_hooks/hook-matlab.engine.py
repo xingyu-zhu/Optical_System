@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import sys
 
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+from PyInstaller.utils.hooks import (
+    collect_data_files,
+    collect_dynamic_libs,
+    collect_submodules,
+)
 
 _suffix = f"{sys.version_info.major}_{sys.version_info.minor}"
 

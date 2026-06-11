@@ -25,7 +25,12 @@ class ParameterSweepDialog(QDialog):
 
     HEADERS = ["启用", "深度", "组件", "参数", "起始", "终止", "步长", "单位"]
 
-    def __init__(self, nodes: list[dict[str, Any]], sweeps: list[dict[str, Any]] | None = None, parent=None):
+    def __init__(
+        self,
+        nodes: list[dict[str, Any]],
+        sweeps: list[dict[str, Any]] | None = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("参数扫描设置")
         self.resize(920, 460)
@@ -66,7 +71,9 @@ class ParameterSweepDialog(QDialog):
             enabled_widget = self.table.cellWidget(row, 0)
             node_combo = self.table.cellWidget(row, 2)
             param_combo = self.table.cellWidget(row, 3)
-            if not isinstance(node_combo, QComboBox) or not isinstance(param_combo, QComboBox):
+            if not isinstance(node_combo, QComboBox) or not isinstance(
+                param_combo, QComboBox
+            ):
                 continue
             node_id = int(node_combo.currentData())
             node = self._node_by_id.get(node_id)
@@ -77,7 +84,9 @@ class ParameterSweepDialog(QDialog):
                 continue
             sweeps.append(
                 {
-                    "enabled": bool(enabled_widget.isChecked()) if isinstance(enabled_widget, QCheckBox) else True,
+                    "enabled": bool(enabled_widget.isChecked())
+                    if isinstance(enabled_widget, QCheckBox)
+                    else True,
                     "depth": self._int_item(row, 1, default=1),
                     "node_id": node_id,
                     "component": str(node.get("name", "")),
@@ -115,8 +124,12 @@ class ParameterSweepDialog(QDialog):
 
         param_combo = QComboBox(self.table)
         self.table.setCellWidget(row, 3, param_combo)
-        node_combo.currentIndexChanged.connect(lambda _index, r=row: self._refresh_param_combo(r))
-        param_combo.currentIndexChanged.connect(lambda _index, r=row: self._sync_unit(r))
+        node_combo.currentIndexChanged.connect(
+            lambda _index, r=row: self._refresh_param_combo(r)
+        )
+        param_combo.currentIndexChanged.connect(
+            lambda _index, r=row: self._sync_unit(r)
+        )
         self._refresh_param_combo(row, preferred=str(sweep.get("parameter", "")))
 
         self.table.setItem(row, 4, QTableWidgetItem(str(sweep.get("start", ""))))
@@ -127,7 +140,9 @@ class ParameterSweepDialog(QDialog):
     def _refresh_param_combo(self, row: int, preferred: str = "") -> None:
         node_combo = self.table.cellWidget(row, 2)
         param_combo = self.table.cellWidget(row, 3)
-        if not isinstance(node_combo, QComboBox) or not isinstance(param_combo, QComboBox):
+        if not isinstance(node_combo, QComboBox) or not isinstance(
+            param_combo, QComboBox
+        ):
             return
         current = preferred or param_combo.currentText()
         param_combo.blockSignals(True)
@@ -148,10 +163,14 @@ class ParameterSweepDialog(QDialog):
     def _current_param_unit(self, row: int) -> str:
         node_combo = self.table.cellWidget(row, 2)
         param_combo = self.table.cellWidget(row, 3)
-        if not isinstance(node_combo, QComboBox) or not isinstance(param_combo, QComboBox):
+        if not isinstance(node_combo, QComboBox) or not isinstance(
+            param_combo, QComboBox
+        ):
             return ""
         node = self._node_by_id.get(int(node_combo.currentData()))
-        value = (node.get("params") or {}).get(param_combo.currentText()) if node else None
+        value = (
+            (node.get("params") or {}).get(param_combo.currentText()) if node else None
+        )
         return str(value[1]) if isinstance(value, list) and len(value) > 1 else ""
 
     def _remove_selected_rows(self) -> None:

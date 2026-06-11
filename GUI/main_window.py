@@ -7,20 +7,41 @@ import tempfile
 import threading
 from pathlib import Path
 
-from PyQt5.QtCore import QThread, Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QKeySequence
-from PyQt5.QtWidgets import QAction, QApplication, QFileDialog, QLabel, QMainWindow, QMessageBox, QProgressDialog, QSplitter, QStyle, QToolBar, QToolButton, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressDialog,
+    QSplitter,
+    QStyle,
+    QToolBar,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from component_panel import ComponentPanel
 from matlab_engine_manager import MatlabEngineManager
 from matlab_topology_runner import MatlabTopologyRunner, SimulationCancelled
 from output_widget import OutputWidget
 from parameter_sweep_dialog import ParameterSweepDialog
-from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
 from signal_plotter import _as_array
-from topology_display import build_component_display_names, build_node_display_indices, result_component_allowed
-from workspace_panel import WorkspacePanel
+from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
+from topology_display import (
+    build_component_display_names,
+    build_node_display_indices,
+    result_component_allowed,
+)
 from topology_executor import TopologyCycleError, TopologyExecutor
+from workspace_panel import WorkspacePanel
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+TOPOLOGY_DIR = PROJECT_DIR / "topologies"
 
 
 class MatlabTopologyWorker(QThread):
@@ -29,7 +50,9 @@ class MatlabTopologyWorker(QThread):
     cancelled = pyqtSignal(str)
     failed = pyqtSignal(str)
 
-    def __init__(self, engine_manager: MatlabEngineManager, topology: dict, parent=None):
+    def __init__(
+        self, engine_manager: MatlabEngineManager, topology: dict, parent=None
+    ):
         super().__init__(parent)
         self.engine_manager = engine_manager
         self.topology = topology
@@ -42,7 +65,9 @@ class MatlabTopologyWorker(QThread):
         try:
             runner = MatlabTopologyRunner(
                 self.engine_manager,
-                log=lambda message, source="INFO": self.log_message.emit(message, source),
+                log=lambda message, source="INFO": self.log_message.emit(
+                    message, source
+                ),
                 cancel_event=self.cancel_event,
             )
             outputs = runner.run(self.topology)
@@ -152,65 +177,137 @@ class MainWindow(QMainWindow):
         menu = self.menuBar()
 
         file_menu = menu.addMenu("文件")
-        file_menu.addAction(self._make_action("新建设计", QKeySequence.New, self._new_topology))
-        file_menu.addAction(self._make_action("打开设计", QKeySequence.Open, self._open_topology))
-        file_menu.addAction(self._make_action("保存设计", QKeySequence.Save, self._save_topology))
-        file_menu.addAction(self._make_action("另存为", QKeySequence.SaveAs, self._save_topology_as))
+        file_menu.addAction(
+            self._make_action("新建设计", QKeySequence.New, self._new_topology)
+        )
+        file_menu.addAction(
+            self._make_action("打开设计", QKeySequence.Open, self._open_topology)
+        )
+        file_menu.addAction(
+            self._make_action("保存设计", QKeySequence.Save, self._save_topology)
+        )
+        file_menu.addAction(
+            self._make_action("另存为", QKeySequence.SaveAs, self._save_topology_as)
+        )
         file_menu.addSeparator()
         file_menu.addAction(self._make_action("退出", QKeySequence.Quit, self.close))
 
         edit_menu = menu.addMenu("编辑")
-        edit_menu.addAction(self._make_action("全选", QKeySequence.SelectAll, self.workspace_panel.select_all))
+        edit_menu.addAction(
+            self._make_action(
+                "全选", QKeySequence.SelectAll, self.workspace_panel.select_all
+            )
+        )
         edit_menu.addAction(
             self._make_action(
                 "删除",
-                [QKeySequence.Delete, QKeySequence("Ctrl+Backspace"), QKeySequence("Meta+Backspace")],
+                [
+                    QKeySequence.Delete,
+                    QKeySequence("Ctrl+Backspace"),
+                    QKeySequence("Meta+Backspace"),
+                ],
                 self.workspace_panel.delete_selected,
             )
         )
-        edit_menu.addAction(self._make_action("复制", QKeySequence.Copy, self.workspace_panel.copy_selected))
-        edit_menu.addAction(self._make_action("粘贴", QKeySequence.Paste, self.workspace_panel.paste_selected))
+        edit_menu.addAction(
+            self._make_action(
+                "复制", QKeySequence.Copy, self.workspace_panel.copy_selected
+            )
+        )
+        edit_menu.addAction(
+            self._make_action(
+                "粘贴", QKeySequence.Paste, self.workspace_panel.paste_selected
+            )
+        )
 
         view_menu = menu.addMenu("视图")
-        view_menu.addAction(self._make_action("放大", "Ctrl++", self.workspace_panel.zoom_in))
-        view_menu.addAction(self._make_action("缩小", "Ctrl+-", self.workspace_panel.zoom_out))
-        view_menu.addAction(self._make_action("重置缩放", "Ctrl+0", self.workspace_panel.reset_zoom))
+        view_menu.addAction(
+            self._make_action("放大", "Ctrl++", self.workspace_panel.zoom_in)
+        )
+        view_menu.addAction(
+            self._make_action("缩小", "Ctrl+-", self.workspace_panel.zoom_out)
+        )
+        view_menu.addAction(
+            self._make_action("重置缩放", "Ctrl+0", self.workspace_panel.reset_zoom)
+        )
 
         sim_menu = menu.addMenu("仿真")
-        sim_menu.addAction(self._make_action("设计仿真", "F5", self._run_topology_simulation))
-        sim_menu.addAction(self._make_action("参数扫描", None, self._configure_parameter_sweep))
-        sim_menu.addAction(self._make_action("仿真结果", None, self._show_simulation_results))
-        self.stop_simulation_action = self._make_action("停止仿真", "Shift+F5", self._stop_topology_simulation)
+        sim_menu.addAction(
+            self._make_action("设计仿真", "F5", self._run_topology_simulation)
+        )
+        sim_menu.addAction(
+            self._make_action("参数扫描", None, self._configure_parameter_sweep)
+        )
+        sim_menu.addAction(
+            self._make_action("仿真结果", None, self._show_simulation_results)
+        )
+        self.stop_simulation_action = self._make_action(
+            "停止仿真", "Shift+F5", self._stop_topology_simulation
+        )
         self.stop_simulation_actions.append(self.stop_simulation_action)
         sim_menu.addAction(self.stop_simulation_action)
 
     def _create_tool_bars(self) -> None:
         file_tb = QToolBar("文件", self)
         self._add_toolbar_action(file_tb, "新建", "SP_FileIcon", self._new_topology)
-        self._add_toolbar_action(file_tb, "打开", "SP_DialogOpenButton", self._open_topology)
-        self._add_toolbar_action(file_tb, "保存", "SP_DialogSaveButton", self._save_topology)
-        self._add_toolbar_action(file_tb, "另存为", "SP_DriveFDIcon", self._save_topology_as)
+        self._add_toolbar_action(
+            file_tb, "打开", "SP_DialogOpenButton", self._open_topology
+        )
+        self._add_toolbar_action(
+            file_tb, "保存", "SP_DialogSaveButton", self._save_topology
+        )
+        self._add_toolbar_action(
+            file_tb, "另存为", "SP_DriveFDIcon", self._save_topology_as
+        )
         self.addToolBar(file_tb)
 
         edit_tb = QToolBar("编辑", self)
-        self._add_toolbar_action(edit_tb, "全选", "custom:select-all", self.workspace_panel.select_all)
-        self._add_toolbar_action(edit_tb, "删除", "custom:delete", self.workspace_panel.delete_selected)
-        self._add_toolbar_action(edit_tb, "复制", "SP_FileDialogDetailedView", self.workspace_panel.copy_selected)
-        self._add_toolbar_action(edit_tb, "粘贴", "custom:paste", self.workspace_panel.paste_selected)
+        self._add_toolbar_action(
+            edit_tb, "全选", "custom:select-all", self.workspace_panel.select_all
+        )
+        self._add_toolbar_action(
+            edit_tb, "删除", "custom:delete", self.workspace_panel.delete_selected
+        )
+        self._add_toolbar_action(
+            edit_tb,
+            "复制",
+            "SP_FileDialogDetailedView",
+            self.workspace_panel.copy_selected,
+        )
+        self._add_toolbar_action(
+            edit_tb, "粘贴", "custom:paste", self.workspace_panel.paste_selected
+        )
         self.addToolBar(edit_tb)
 
         view_tb = QToolBar("视图", self)
-        self._add_toolbar_action(view_tb, "放大", "custom:zoom-in", self.workspace_panel.zoom_in)
-        self._add_toolbar_action(view_tb, "缩小", "custom:zoom-out", self.workspace_panel.zoom_out)
-        self._add_toolbar_action(view_tb, "重置", "SP_BrowserReload", self.workspace_panel.reset_zoom)
+        self._add_toolbar_action(
+            view_tb, "放大", "custom:zoom-in", self.workspace_panel.zoom_in
+        )
+        self._add_toolbar_action(
+            view_tb, "缩小", "custom:zoom-out", self.workspace_panel.zoom_out
+        )
+        self._add_toolbar_action(
+            view_tb, "重置", "SP_BrowserReload", self.workspace_panel.reset_zoom
+        )
         self.addToolBar(view_tb)
 
         sim_tb = QToolBar("仿真", self)
-        self._add_toolbar_action(sim_tb, "运行", "SP_MediaPlay", self._run_topology_simulation)
-        toolbar_stop_action = self._add_toolbar_action(sim_tb, "停止仿真", "SP_MediaStop", self._stop_topology_simulation)
+        self._add_toolbar_action(
+            sim_tb, "运行", "SP_MediaPlay", self._run_topology_simulation
+        )
+        toolbar_stop_action = self._add_toolbar_action(
+            sim_tb, "停止仿真", "SP_MediaStop", self._stop_topology_simulation
+        )
         self.stop_simulation_actions.append(toolbar_stop_action)
-        self._add_toolbar_action(sim_tb, "参数扫描", "custom:sweep", self._configure_parameter_sweep)
-        self._add_toolbar_action(sim_tb, "仿真结果", "SP_FileDialogContentsView", self._show_simulation_results)
+        self._add_toolbar_action(
+            sim_tb, "参数扫描", "custom:sweep", self._configure_parameter_sweep
+        )
+        self._add_toolbar_action(
+            sim_tb,
+            "仿真结果",
+            "SP_FileDialogContentsView",
+            self._show_simulation_results,
+        )
         self.addToolBar(sim_tb)
 
     def _create_status_area(self, initial_engine_status: str) -> None:
@@ -229,7 +326,9 @@ class MainWindow(QMainWindow):
         self.component_panel.component_selected.connect(self._on_component_selected)
         self.workspace_panel.topology_changed.connect(self._on_topology_changed)
         self.workspace_panel.design_changed.connect(self._on_design_changed)
-        self.workspace_panel.analyzer_open_requested.connect(self._show_analyzer_for_node)
+        self.workspace_panel.analyzer_open_requested.connect(
+            self._show_analyzer_for_node
+        )
         self.output_widget.log_python_output("GUI initialized.")
 
     def _make_action(self, text: str, shortcut, callback) -> QAction:
@@ -242,7 +341,9 @@ class MainWindow(QMainWindow):
         action.triggered.connect(callback)
         return action
 
-    def _add_toolbar_action(self, toolbar: QToolBar, text: str, icon_name: str, callback) -> QAction:
+    def _add_toolbar_action(
+        self, toolbar: QToolBar, text: str, icon_name: str, callback
+    ) -> QAction:
         action = self._make_action(text, None, callback)
         icon = self._standard_icon(icon_name)
         if not icon.isNull():
@@ -254,7 +355,9 @@ class MainWindow(QMainWindow):
 
         button = toolbar.widgetForAction(action)
         if isinstance(button, QToolButton):
-            button.setToolButtonStyle(Qt.ToolButtonIconOnly if not icon.isNull() else Qt.ToolButtonTextOnly)
+            button.setToolButtonStyle(
+                Qt.ToolButtonIconOnly if not icon.isNull() else Qt.ToolButtonTextOnly
+            )
             button.setAccessibleName(text)
         return action
 
@@ -282,7 +385,9 @@ class MainWindow(QMainWindow):
             painter.setPen(QPen(accent, 1.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
             painter.drawRoundedRect(8, 8, 8, 8, 1, 1)
         elif name == "delete":
-            painter.setPen(QPen(QColor("#c62828"), 3.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.setPen(
+                QPen(QColor("#c62828"), 3.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            )
             painter.drawLine(6, 6, 18, 18)
             painter.drawLine(18, 6, 6, 18)
         elif name == "sweep":
@@ -329,7 +434,10 @@ class MainWindow(QMainWindow):
     def _open_topology(self) -> None:
         if not self._confirm_saved_or_continue():
             return
-        file_path, _ = QFileDialog.getOpenFileName(self, "打开设计文件", "", "JSON (*.json)")
+        topology_dir = self._default_topology_dir()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "打开设计文件", str(topology_dir), "JSON (*.json)"
+        )
         if file_path:
             self._suppress_dirty_tracking = True
             try:
@@ -339,34 +447,55 @@ class MainWindow(QMainWindow):
             self._set_topology_file_path(file_path)
             self._mark_design_clean()
             self.status_label.setText("设计已加载")
-            self.output_widget.append_message(f"Design loaded: {file_path}", source="INFO")
+            self.output_widget.append_message(
+                f"Design loaded: {file_path}", source="INFO"
+            )
 
     def _save_topology(self) -> bool:
-        if self._topology_file_path is not None and not self._topology_path_is_temporary:
+        if (
+            self._topology_file_path is not None
+            and not self._topology_path_is_temporary
+        ):
             self.workspace_panel.save_topology(str(self._topology_file_path))
             self._mark_design_clean()
             self.status_label.setText("设计已保存")
-            self.output_widget.append_message(f"Design saved: {self._topology_file_path}", source="INFO")
+            self.output_widget.append_message(
+                f"Design saved: {self._topology_file_path}", source="INFO"
+            )
             return True
         return self._save_topology_as()
 
     def _save_topology_as(self) -> bool:
-        default_name = self._topology_file_path.name if self._topology_file_path else "design.json"
-        file_path, _ = QFileDialog.getSaveFileName(self, "另存设计文件", default_name, "JSON (*.json)")
+        topology_dir = self._default_topology_dir()
+        default_name = (
+            self._topology_file_path.name if self._topology_file_path else "design.json"
+        )
+        default_path = topology_dir / default_name
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "另存设计文件", str(default_path), "JSON (*.json)"
+        )
         if file_path:
             file_path = str(self._ensure_json_suffix(Path(file_path)))
             self.workspace_panel.save_topology(file_path)
             self._set_topology_file_path(file_path, force_saved=True)
             self._mark_design_clean()
             self.status_label.setText("设计已保存")
-            self.output_widget.append_message(f"Design saved: {file_path}", source="INFO")
+            self.output_widget.append_message(
+                f"Design saved: {file_path}", source="INFO"
+            )
             return True
         return False
 
-    def _set_topology_file_path(self, file_path: str | Path | None, force_saved: bool = False) -> None:
-        self._topology_file_path = Path(file_path).expanduser().resolve() if file_path else None
+    def _set_topology_file_path(
+        self, file_path: str | Path | None, force_saved: bool = False
+    ) -> None:
+        self._topology_file_path = (
+            Path(file_path).expanduser().resolve() if file_path else None
+        )
         self._topology_path_is_temporary = (
-            False if force_saved or self._topology_file_path is None else self._is_temporary_path(self._topology_file_path)
+            False
+            if force_saved or self._topology_file_path is None
+            else self._is_temporary_path(self._topology_file_path)
         )
         self._refresh_window_title()
 
@@ -376,8 +505,14 @@ class MainWindow(QMainWindow):
         if self._topology_file_path is None:
             self.setWindowTitle(f"{dirty}{app_name}")
             return
-        suffix = "临时文件，保存时将另存为" if self._topology_path_is_temporary else str(self._topology_file_path)
-        self.setWindowTitle(f"{dirty}{app_name} - {self._topology_file_path.name} ({suffix})")
+        suffix = (
+            "临时文件，保存时将另存为"
+            if self._topology_path_is_temporary
+            else str(self._topology_file_path)
+        )
+        self.setWindowTitle(
+            f"{dirty}{app_name} - {self._topology_file_path.name} ({suffix})"
+        )
 
     def _current_design_snapshot(self) -> str:
         data = self.workspace_panel.scene.serialize()
@@ -396,7 +531,9 @@ class MainWindow(QMainWindow):
             "edges": edges,
             "parameter_sweeps": data.get("parameter_sweeps", []),
         }
-        return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
 
     def _mark_design_clean(self) -> None:
         self._saved_design_snapshot = self._current_design_snapshot()
@@ -406,7 +543,9 @@ class MainWindow(QMainWindow):
     def _on_design_changed(self) -> None:
         if self._suppress_dirty_tracking:
             return
-        self._design_dirty = self._current_design_snapshot() != self._saved_design_snapshot
+        self._design_dirty = (
+            self._current_design_snapshot() != self._saved_design_snapshot
+        )
         self._refresh_window_title()
 
     def _confirm_saved_or_continue(self) -> bool:
@@ -432,6 +571,11 @@ class MainWindow(QMainWindow):
         return path if path.suffix.lower() == ".json" else path.with_suffix(".json")
 
     @staticmethod
+    def _default_topology_dir() -> Path:
+        TOPOLOGY_DIR.mkdir(exist_ok=True)
+        return TOPOLOGY_DIR
+
+    @staticmethod
     def _is_temporary_path(path: Path) -> bool:
         path = path.expanduser().resolve()
         candidates = {Path(tempfile.gettempdir()), Path("/tmp"), Path("/private/tmp")}
@@ -451,10 +595,14 @@ class MainWindow(QMainWindow):
             self.output_widget.append_message("Design execution plan:", source="INFO")
             for i, level in enumerate(levels, start=1):
                 names = [executor.nodes[nid].name for nid in level]
-                self.output_widget.append_message(f"L{i}: {list(zip(level, names))}", source="INFO")
+                self.output_widget.append_message(
+                    f"L{i}: {list(zip(level, names))}", source="INFO"
+                )
 
             def _runner(node, inputs_by_port):
-                ports = sorted(k for k in inputs_by_port.keys() if not k.startswith("__"))
+                ports = sorted(
+                    k for k in inputs_by_port.keys() if not k.startswith("__")
+                )
                 self.output_widget.append_message(
                     f"Run node {node.node_id} ({node.name}), inputs={ports}",
                     source="PYTHON",
@@ -485,7 +633,11 @@ class MainWindow(QMainWindow):
 
         worker = MatlabTopologyWorker(self.engine_manager, topology, self)
         self._simulation_worker = worker
-        worker.log_message.connect(lambda message, source: self.output_widget.append_message(message, source=source))
+        worker.log_message.connect(
+            lambda message, source: self.output_widget.append_message(
+                message, source=source
+            )
+        )
         worker.finished_ok.connect(self._on_topology_simulation_finished)
         worker.cancelled.connect(self._on_topology_simulation_cancelled)
         worker.failed.connect(self._on_topology_simulation_failed)
@@ -496,18 +648,24 @@ class MainWindow(QMainWindow):
     def _stop_topology_simulation(self) -> None:
         worker = self._simulation_worker
         if worker is None or not worker.isRunning():
-            self.output_widget.append_message("当前没有正在运行的设计仿真。", source="INFO")
+            self.output_widget.append_message(
+                "当前没有正在运行的设计仿真。", source="INFO"
+            )
             return
         worker.request_stop()
         self._set_simulation_running(False)
         self.status_label.setText("正在停止设计仿真")
-        self.output_widget.append_message("已请求停止仿真，正在等待当前 MATLAB 调用结束或取消。", source="INFO")
+        self.output_widget.append_message(
+            "已请求停止仿真，正在等待当前 MATLAB 调用结束或取消。", source="INFO"
+        )
 
     def _configure_parameter_sweep(self) -> None:
         topology = self.workspace_panel.scene.serialize()
         nodes = topology.get("nodes", [])
         if not nodes:
-            self.output_widget.append_message("请先在工作区添加组件，再配置参数扫描。", source="INFO")
+            self.output_widget.append_message(
+                "请先在工作区添加组件，再配置参数扫描。", source="INFO"
+            )
             return
 
         dialog = ParameterSweepDialog(nodes, topology.get("parameter_sweeps", []), self)
@@ -525,7 +683,9 @@ class MainWindow(QMainWindow):
         self._latest_outputs = outputs or {}
         self._simulation_worker = None
         self.status_label.setText("设计仿真完成")
-        self.output_widget.append_message("设计仿真完成。双击光/电分析仪组件可查看对应结果。", source="INFO")
+        self.output_widget.append_message(
+            "设计仿真完成。双击光/电分析仪组件可查看对应结果。", source="INFO"
+        )
 
     def _on_topology_simulation_cancelled(self, message: str) -> None:
         self._simulation_worker = None
@@ -534,7 +694,9 @@ class MainWindow(QMainWindow):
 
     def _on_topology_simulation_failed(self, message: str) -> None:
         self._simulation_worker = None
-        self.output_widget.append_message(f"MATLAB run error: {message}", source="ERROR")
+        self.output_widget.append_message(
+            f"MATLAB run error: {message}", source="ERROR"
+        )
         self.status_label.setText("设计仿真失败")
 
     def _show_analyzer_for_node(self, node_id: int, name: str) -> None:
@@ -550,10 +712,17 @@ class MainWindow(QMainWindow):
         if "powermeter" in normalized:
             self._show_power_meter_result(display_name, workspace)
             return
-        if workspace.get("Status") != "called" or workspace.get("AnalyzerSignal") is None:
+        if (
+            workspace.get("Status") != "called"
+            or workspace.get("AnalyzerSignal") is None
+        ):
             waiting_for = workspace.get("WaitingFor")
             error = workspace.get("Error")
-            detail = f"等待: {waiting_for}" if waiting_for else (f"错误: {error}" if error else "无有效分析仪信号")
+            detail = (
+                f"等待: {waiting_for}"
+                if waiting_for
+                else (f"错误: {error}" if error else "无有效分析仪信号")
+            )
             self.output_widget.append_message(
                 f"{display_name} 暂无可显示结果，{detail}。",
                 source="INFO",
@@ -574,8 +743,14 @@ class MainWindow(QMainWindow):
         if workspace.get("Status") != "called" or "Power_dBm" not in workspace:
             waiting_for = workspace.get("WaitingFor")
             error = workspace.get("Error")
-            detail = f"等待: {waiting_for}" if waiting_for else (f"错误: {error}" if error else "无有效光功率")
-            self.output_widget.append_message(f"{display_name} 暂无可显示功率，{detail}。", source="INFO")
+            detail = (
+                f"等待: {waiting_for}"
+                if waiting_for
+                else (f"错误: {error}" if error else "无有效光功率")
+            )
+            self.output_widget.append_message(
+                f"{display_name} 暂无可显示功率，{detail}。", source="INFO"
+            )
             return
 
         power_dbm = self._scalar_display(workspace.get("Power_dBm"), "dBm")
@@ -650,7 +825,9 @@ class MainWindow(QMainWindow):
                     "name": f"{display_name}{suffix}",
                     "SNR": MainWindow._metric_value(snr, idx),
                     "BER": MainWindow._metric_value(ber, idx),
-                    "constellation": MainWindow._constellation_for_index(workspace, idx),
+                    "constellation": MainWindow._constellation_for_index(
+                        workspace, idx
+                    ),
                 }
             )
         return rows
@@ -677,13 +854,20 @@ class MainWindow(QMainWindow):
 
     def _display_name_for_node(self, node_id: int, fallback: str) -> str:
         topology = self._latest_topology or self.workspace_panel.scene.serialize()
-        return build_component_display_names(topology.get("nodes", [])).get(int(node_id), fallback)
+        return build_component_display_names(topology.get("nodes", [])).get(
+            int(node_id), fallback
+        )
 
     @staticmethod
     def _workspace_from_outputs(outputs) -> dict:
         if not isinstance(outputs, dict):
             return {}
-        workspace = outputs.get("default") or outputs.get("right") or outputs.get("bottom") or outputs.get("info")
+        workspace = (
+            outputs.get("default")
+            or outputs.get("right")
+            or outputs.get("bottom")
+            or outputs.get("info")
+        )
         return workspace if isinstance(workspace, dict) else {}
 
     def _on_component_selected(self, name: str) -> None:
@@ -691,7 +875,9 @@ class MainWindow(QMainWindow):
         self.output_widget.append_message(f"Component selected: {name}", source="INFO")
 
     def _on_topology_changed(self, component_count: int, connection_count: int) -> None:
-        self.design_info_label.setText(f"组件: {component_count} | 连接: {connection_count}")
+        self.design_info_label.setText(
+            f"组件: {component_count} | 连接: {connection_count}"
+        )
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._allow_close_after_shutdown:
@@ -715,9 +901,13 @@ class MainWindow(QMainWindow):
         worker = self._simulation_worker
         if worker is not None and worker.isRunning():
             worker.request_stop()
-            self.output_widget.append_message("关闭程序前正在停止当前仿真。", source="INFO")
+            self.output_widget.append_message(
+                "关闭程序前正在停止当前仿真。", source="INFO"
+            )
 
-        self._shutdown_dialog = QProgressDialog("正在断开 MATLAB 引擎，请稍候...", None, 0, 0, self)
+        self._shutdown_dialog = QProgressDialog(
+            "正在断开 MATLAB 引擎，请稍候...", None, 0, 0, self
+        )
         self._shutdown_dialog.setWindowTitle("正在关闭")
         self._shutdown_dialog.setWindowModality(Qt.ApplicationModal)
         self._shutdown_dialog.setCancelButton(None)
@@ -741,7 +931,9 @@ class MainWindow(QMainWindow):
 
     def _on_shutdown_failed(self, message: str) -> None:
         if self.output_widget is not None:
-            self.output_widget.append_message(f"MATLAB disconnect error: {message}", source="ERROR")
+            self.output_widget.append_message(
+                f"MATLAB disconnect error: {message}", source="ERROR"
+            )
         self._finish_shutdown("Disconnect Error")
 
     def _finish_shutdown(self, engine_status: str) -> None:

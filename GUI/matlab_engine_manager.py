@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import platform
 import sys
-from pathlib import Path
 import threading
-import json
+from pathlib import Path
 from typing import Any, Optional
 
 
@@ -87,7 +87,9 @@ class MatlabEngineManager:
         self._configure_windows_runtime_paths(roots)
         self._configure_direct_engine_import_path_for_development(roots)
 
-    def _configure_direct_engine_import_path_for_development(self, roots: list[Path]) -> None:
+    def _configure_direct_engine_import_path_for_development(
+        self, roots: list[Path]
+    ) -> None:
         """Optionally allow direct MATLAB Engine source imports for developers.
 
         Normal users and packaged builds should not use this path.  It is kept
@@ -113,7 +115,9 @@ class MatlabEngineManager:
                 return
 
     def _matlab_engine_path_candidates(self) -> list[Path]:
-        return self._matlab_engine_path_candidates_for_roots(self._matlab_root_candidates())
+        return self._matlab_engine_path_candidates_for_roots(
+            self._matlab_root_candidates()
+        )
 
     def _matlab_engine_path_candidates_for_roots(self, roots: list[Path]) -> list[Path]:
         paths: list[Path] = []
@@ -321,10 +325,26 @@ class MatlabEngineManager:
         roots = self._matlab_root_candidates()
         candidates = self._matlab_engine_path_candidates()
         existing = [str(path) for path in candidates if path.exists()]
-        root_text = ", ".join(str(root) for root in roots) if roots else "未检测到 MATLAB 安装目录"
-        path_text = ", ".join(existing) if existing else "未检测到可用的 MATLAB Engine Python 路径"
-        detail = f"\n原始错误: {type(original_error).__name__}: {original_error}" if original_error else ""
-        first_detail = f"\n首次导入错误: {type(first_error).__name__}: {first_error}" if first_error else ""
+        root_text = (
+            ", ".join(str(root) for root in roots)
+            if roots
+            else "未检测到 MATLAB 安装目录"
+        )
+        path_text = (
+            ", ".join(existing)
+            if existing
+            else "未检测到可用的 MATLAB Engine Python 路径"
+        )
+        detail = (
+            f"\n原始错误: {type(original_error).__name__}: {original_error}"
+            if original_error
+            else ""
+        )
+        first_detail = (
+            f"\n首次导入错误: {type(first_error).__name__}: {first_error}"
+            if first_error
+            else ""
+        )
         python_text = sys.executable
         frozen_note = (
             "\n当前程序是打包后的 exe。请在打包用的 Python 环境中先安装 MATLAB Engine，"
@@ -348,7 +368,7 @@ class MatlabEngineManager:
         if self._engine is None:
             return
 
-        pon_dir = Path(__file__).resolve().parent / "PON"
+        pon_dir = self._resolve_pon_dir()
         if not pon_dir.exists():
             return
 
@@ -358,6 +378,26 @@ class MatlabEngineManager:
         except Exception:
             # Path setup should not prevent the engine from starting.
             pass
+
+    @staticmethod
+    def _resolve_pon_dir() -> Path:
+        module_dir = Path(__file__).resolve().parent
+        candidates = [
+            module_dir.parent / "PON",
+            module_dir / "PON",
+        ]
+        if getattr(sys, "frozen", False):
+            executable_dir = Path(sys.executable).resolve().parent
+            candidates.extend(
+                [
+                    executable_dir / "PON",
+                    Path(getattr(sys, "_MEIPASS", executable_dir)) / "PON",
+                ]
+            )
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[0]
 
     def stop(self) -> None:
         """Stop current MATLAB Engine session if running."""

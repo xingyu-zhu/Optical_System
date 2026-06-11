@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 COMPONENT_TO_MATLAB_FUNCTION = {
     "olttxdsp": "OC_TxDSP_Module",
     "onutxdsp": "OC_TxDSP_Module_v4_up",
