@@ -51,7 +51,7 @@ dist\OpticalSystemGUI\
 ```text
 OpticalSystemGUI.exe
 _internal\
-PON\
+Component\
 icon\
 ```
 
@@ -252,7 +252,7 @@ dist\OpticalSystemGUI\
 dist\OpticalSystemGUI\OpticalSystemGUI.exe
 dist\OpticalSystemGUI\_internal\matlab\engine\_arch.txt
 dist\OpticalSystemGUI\_internal\matlabengineforpython3_10.pyd
-dist\OpticalSystemGUI\PON\
+dist\OpticalSystemGUI\Component\
 dist\OpticalSystemGUI\icon\
 ```
 

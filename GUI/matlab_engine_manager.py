@@ -364,34 +364,34 @@ class MatlabEngineManager:
         )
 
     def _configure_project_paths(self) -> None:
-        """Add the local PON component library and keep MATLAB plots headless."""
+        """Add the local MATLAB component library and keep MATLAB plots headless."""
         if self._engine is None:
             return
 
-        pon_dir = self._resolve_pon_dir()
-        if not pon_dir.exists():
+        component_dir = self._resolve_component_dir()
+        if not component_dir.exists():
             return
 
         try:
-            self._engine.addpath(self._engine.genpath(str(pon_dir)), nargout=0)
+            self._engine.addpath(self._engine.genpath(str(component_dir)), nargout=0)
             self._engine.eval("set(0, 'DefaultFigureVisible', 'off');", nargout=0)
         except Exception:
             # Path setup should not prevent the engine from starting.
             pass
 
     @staticmethod
-    def _resolve_pon_dir() -> Path:
+    def _resolve_component_dir() -> Path:
         module_dir = Path(__file__).resolve().parent
         candidates = [
-            module_dir.parent / "PON",
-            module_dir / "PON",
+            module_dir.parent / "Component",
+            module_dir / "Component",
         ]
         if getattr(sys, "frozen", False):
             executable_dir = Path(sys.executable).resolve().parent
             candidates.extend(
                 [
-                    executable_dir / "PON",
-                    Path(getattr(sys, "_MEIPASS", executable_dir)) / "PON",
+                    executable_dir / "Component",
+                    Path(getattr(sys, "_MEIPASS", executable_dir)) / "Component",
                 ]
             )
         for candidate in candidates:

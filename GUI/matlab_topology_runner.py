@@ -76,7 +76,7 @@ class MatlabTopologyRunner:
             node_context["return_lightweight"] = True
             outputs = self._feval_interruptible(
                 eng,
-                "OC_GUI_RunWorkspaceComponent",
+                "GUI_RunWorkspaceComponent",
                 node.name,
                 function_name,
                 matlab_inputs,
@@ -684,7 +684,7 @@ class MatlabTopologyRunner:
         """Release full per-node MATLAB workspaces after Python has summaries."""
         try:
             eng.feval(
-                "OC_GUI_RunWorkspaceComponent",
+                "GUI_RunWorkspaceComponent",
                 "__clear_cache__",
                 "",
                 {},
@@ -701,7 +701,7 @@ class MatlabTopologyRunner:
         try:
             ref = self._workspace_ref_for_node(node_id, component_name)
             eng.feval(
-                "OC_GUI_RunWorkspaceComponent",
+                "GUI_RunWorkspaceComponent",
                 "__delete_cache__",
                 ref,
                 {},
