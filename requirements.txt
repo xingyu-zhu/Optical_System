@@ -1,0 +1,12 @@
+# Runtime dependencies for the Optical_System GUI.
+PyQt5==5.15.11
+numpy==2.3.5
+matplotlib==3.10.6
+
+# Build/packaging dependency used by GUI/build_windows.ps1.
+pyinstaller>=6.0,<7.0
+
+# MATLAB Engine is required for running simulations, but it should be installed
+# from the local MATLAB installation rather than from this requirements file:
+#   cd <MATLABROOT>/extern/engines/python
+#   python -m pip install .

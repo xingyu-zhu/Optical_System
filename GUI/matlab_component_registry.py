@@ -30,6 +30,8 @@ COMPONENT_TO_MATLAB_FUNCTION = {
     "oanalyzer": "PowerMeter_Module",
     "eanalyzer": "PowerMeter_Module",
     "powermeter": "PowerMeter_Module",
+    "externalmatlab": "ExternalMatlabFile",
+    "matlabfile": "ExternalMatlabFile",
 }
 
 

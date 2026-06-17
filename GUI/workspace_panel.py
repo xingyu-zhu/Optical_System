@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 from PyQt5.QtCore import QPointF, Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QKeySequence, QPainter, QPen, QPixmap
@@ -13,6 +14,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QGraphicsEllipseItem,
     QGraphicsItem,
     QGraphicsLineItem,
@@ -21,8 +23,11 @@ from PyQt5.QtWidgets import (
     QGraphicsScene,
     QGraphicsSimpleTextItem,
     QGraphicsView,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMenu,
+    QPushButton,
     QShortcut,
     QTableWidget,
     QTableWidgetItem,
@@ -138,6 +143,13 @@ DEFAULT_COMPONENT_PARAMS: dict[str, dict[str, list[str]]] = {
         "Adaptive_EQ": ["True", "", "自适应均衡"],
         "TargetONU": ["Auto", "", "上行目标 ONU 时隙"],
     },
+    "MatlabFile": {
+        "MatlabFile": ["", "", "外部 .m 文件完整路径（可选）"],
+        "FunctionName": ["", "", "函数名（留空时由文件名推断）"],
+        "AddToPath": ["True", "", "运行前将文件目录加入 MATLAB 路径"],
+        "Nargout": ["1", "", "外部函数输出数量"],
+        "MergeOutput": ["True", "", "返回 struct 时合并到当前工作区"],
+    },
 }
 
 
@@ -204,10 +216,40 @@ class ComponentParameterDialog(QDialog):
                     "True" if str(value).strip().lower() == "true" else "False"
                 )
                 self.table.setCellWidget(row, 1, combo)
+            elif self._is_file_path_param(k):
+                self.table.setCellWidget(row, 1, self._make_file_picker(str(value)))
             else:
                 self.table.setItem(row, 1, QTableWidgetItem(str(value)))
             self.table.setItem(row, 2, QTableWidgetItem(str(unit)))
             self.table.setItem(row, 3, QTableWidgetItem(str(desc)))
+
+    def _make_file_picker(self, value: str) -> QWidget:
+        container = QWidget(self.table)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        line_edit = QLineEdit(value, container)
+        button = QPushButton("浏览...", container)
+        button.setFixedWidth(72)
+        button.clicked.connect(lambda: self._choose_matlab_file(line_edit))
+
+        layout.addWidget(line_edit, 1)
+        layout.addWidget(button)
+        container._value_editor = line_edit
+        return container
+
+    def _choose_matlab_file(self, line_edit: QLineEdit) -> None:
+        current = line_edit.text().strip()
+        start_dir = str(Path(current).expanduser().parent) if current else ""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择 MATLAB 文件",
+            start_dir,
+            "MATLAB Files (*.m);;All Files (*)",
+        )
+        if file_path:
+            line_edit.setText(file_path)
 
     def _apply_mode_visibility(self, *_args) -> None:
         mode = self._current_mode()
@@ -261,6 +303,8 @@ class ComponentParameterDialog(QDialog):
             widget = self.table.cellWidget(row, 1)
             if isinstance(widget, QComboBox):
                 value = widget.currentText()
+            elif widget is not None and hasattr(widget, "_value_editor"):
+                value = widget._value_editor.text().strip()
             else:
                 value = (
                     self.table.item(row, 1).text().strip()
@@ -285,6 +329,12 @@ class ComponentParameterDialog(QDialog):
         if isinstance(value, bool):
             return True
         return str(value).strip().lower() in BOOLEAN_VALUES
+
+    def _is_file_path_param(self, key: str) -> bool:
+        return (
+            self.component_name.strip().lower() == "matlabfile"
+            and key.strip().lower() == "matlabfile"
+        )
 
 
 class PortItem(QGraphicsEllipseItem):

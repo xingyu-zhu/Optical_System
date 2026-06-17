@@ -43,6 +43,7 @@ class MatlabEngineManager:
                 self._configure_project_paths()
                 return self._engine
 
+            self._configure_engine_python_path()
             try:
                 import matlab.engine
             except Exception as first_exc:
@@ -61,18 +62,15 @@ class MatlabEngineManager:
                     if shared_name:
                         if shared_name in names:
                             self._engine = matlab.engine.connect_matlab(shared_name)
-                            self._configure_project_paths()
-                            return self._engine
+                            return self._finalize_started_engine()
                     elif names:
                         self._engine = matlab.engine.connect_matlab(names[0])
-                        self._configure_project_paths()
-                        return self._engine
+                        return self._finalize_started_engine()
                 except Exception:
                     pass
 
             self._engine = matlab.engine.start_matlab()
-            self._configure_project_paths()
-            return self._engine
+            return self._finalize_started_engine()
 
     def _configure_engine_python_path(self) -> None:
         """Configure MATLAB runtime paths across macOS, Windows, and Linux.
@@ -84,8 +82,28 @@ class MatlabEngineManager:
         Therefore this method only prepares MATLAB runtime/DLL locations.
         """
         roots = self._matlab_root_candidates()
+        self._configure_preferred_engine_import_path(roots)
         self._configure_windows_runtime_paths(roots)
         self._configure_direct_engine_import_path_for_development(roots)
+
+    def _configure_preferred_engine_import_path(self, roots: list[Path]) -> None:
+        """Prefer the user-selected MATLAB Engine package during development."""
+        if getattr(sys, "frozen", False):
+            return
+
+        preferred_root = self._preferred_matlab_root()
+        if preferred_root is None:
+            return
+
+        candidates = self._matlab_engine_path_candidates_for_roots([preferred_root])
+        for path in candidates:
+            if not path.exists() or not self._engine_python_path_is_usable(path):
+                continue
+            text = str(path)
+            sys.path[:] = [item for item in sys.path if item != text]
+            sys.path.insert(0, text)
+            self._clear_partial_matlab_imports()
+            return
 
     def _configure_direct_engine_import_path_for_development(
         self, roots: list[Path]
@@ -153,23 +171,24 @@ class MatlabEngineManager:
         return True
 
     def _matlab_root_candidates(self) -> list[Path]:
-        roots: list[Path] = []
+        preferred_roots: list[Path] = []
+        auto_roots: list[Path] = []
+
+        if self._manual_matlab_root is not None:
+            preferred_roots.append(self._manual_matlab_root)
 
         configured = self._configured_matlab_root()
         if configured is not None:
-            roots.append(configured)
-
-        if self._manual_matlab_root is not None:
-            roots.append(self._manual_matlab_root)
+            preferred_roots.append(configured)
 
         for env_name in ("MATLABROOT", "MATLAB_ROOT"):
             value = os.environ.get(env_name)
             if value:
-                roots.append(Path(value))
+                preferred_roots.append(Path(value))
 
         system = platform.system().lower()
         if system == "darwin":
-            roots.extend(Path("/Applications").glob("MATLAB_R*.app"))
+            auto_roots.extend(Path("/Applications").glob("MATLAB_R*.app"))
         elif system == "windows":
             program_dirs = [
                 os.environ.get("ProgramFiles"),
@@ -180,13 +199,32 @@ class MatlabEngineManager:
                     continue
                 matlab_dir = Path(base) / "MATLAB"
                 if matlab_dir.exists():
-                    roots.extend(matlab_dir.glob("R*"))
+                    auto_roots.extend(matlab_dir.glob("R*"))
         else:
             for base in (Path("/usr/local/MATLAB"), Path("/opt/MATLAB")):
                 if base.exists():
-                    roots.extend(base.glob("R*"))
+                    auto_roots.extend(base.glob("R*"))
 
-        return self._sort_matlab_roots(roots)
+        return self._unique_matlab_roots(
+            preferred_roots + self._sort_matlab_roots(auto_roots)
+        )
+
+    def _preferred_matlab_root(self) -> Path | None:
+        if self._manual_matlab_root is not None:
+            return self._manual_matlab_root
+
+        configured = self._configured_matlab_root()
+        if configured is not None:
+            return configured
+
+        for env_name in ("MATLABROOT", "MATLAB_ROOT"):
+            value = os.environ.get(env_name)
+            if not value:
+                continue
+            root = self._normalize_matlab_root(Path(value))
+            if root is not None:
+                return root
+        return None
 
     def set_matlab_root(self, selected_path: str | Path, persist: bool = True) -> Path:
         """Set a user-selected MATLAB root or Engine folder.
@@ -197,16 +235,20 @@ class MatlabEngineManager:
         - extern/engines/python
         - extern/engines/python/dist
         """
-        root = self._normalize_matlab_root(Path(selected_path))
-        if root is None:
-            raise ValueError(
-                "所选目录不是有效的 MATLAB 安装目录或 MATLAB Engine Python 目录。"
-            )
-        self._manual_matlab_root = root
-        if persist:
-            self._save_configured_matlab_root(root)
-        self._configure_engine_python_path()
-        return root
+        with self._lock:
+            root = self._normalize_matlab_root(Path(selected_path))
+            if root is None:
+                raise ValueError(
+                    "所选目录不是有效的 MATLAB 安装目录或 MATLAB Engine Python 目录。"
+                )
+            if self._engine is not None:
+                self.stop()
+            self._manual_matlab_root = root
+            if persist:
+                self._save_configured_matlab_root(root)
+            self._clear_partial_matlab_imports()
+            self._configure_engine_python_path()
+            return root
 
     def _normalize_matlab_root(self, path: Path) -> Path | None:
         try:
@@ -264,6 +306,14 @@ class MatlabEngineManager:
 
     @staticmethod
     def _sort_matlab_roots(roots: list[Path]) -> list[Path]:
+        return sorted(
+            MatlabEngineManager._unique_matlab_roots(roots),
+            key=lambda path: path.name,
+            reverse=True,
+        )
+
+    @staticmethod
+    def _unique_matlab_roots(roots: list[Path]) -> list[Path]:
         unique = []
         seen: set[str] = set()
         for root in roots:
@@ -275,7 +325,7 @@ class MatlabEngineManager:
                 continue
             seen.add(resolved)
             unique.append(Path(resolved))
-        return sorted(unique, key=lambda path: path.name, reverse=True)
+        return unique
 
     @staticmethod
     def _unique_existing_or_possible_paths(paths: list[Path]) -> list[Path]:
@@ -362,6 +412,44 @@ class MatlabEngineManager:
             f"{first_detail}"
             f"{detail}"
         )
+
+    def _finalize_started_engine(self):
+        try:
+            self._validate_selected_matlab_root()
+            self._configure_project_paths()
+            return self._engine
+        except Exception:
+            self._engine = None
+            raise
+
+    def _validate_selected_matlab_root(self) -> None:
+        if self._engine is None:
+            return
+        expected = self._preferred_matlab_root()
+        if expected is None:
+            return
+        try:
+            actual_text = self._engine.matlabroot(nargout=1)
+        except Exception:
+            return
+        actual = self._normalize_path_for_compare(Path(str(actual_text)))
+        expected_text = self._normalize_path_for_compare(expected)
+        if actual == expected_text:
+            return
+        raise RuntimeError(
+            "MATLAB Engine 版本与所选 MATLAB 安装目录不一致。\n"
+            f"所选 MATLAB: {expected}\n"
+            f"实际启动 MATLAB: {actual_text}\n"
+            "请在当前 Python 环境中从所选 MATLAB 的 extern/engines/python 目录重新安装 MATLAB Engine，"
+            "或选择与已安装 matlab.engine 匹配的 MATLAB 版本。"
+        )
+
+    @staticmethod
+    def _normalize_path_for_compare(path: Path) -> str:
+        try:
+            return os.path.normcase(str(path.expanduser().resolve()))
+        except Exception:
+            return os.path.normcase(str(path))
 
     def _configure_project_paths(self) -> None:
         """Add the local MATLAB component library and keep MATLAB plots headless."""

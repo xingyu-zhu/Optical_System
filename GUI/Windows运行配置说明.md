@@ -214,6 +214,11 @@ cd "C:\Program Files\MATLAB\R2024b\extern\engines\python"
 C:\Users\xingy\Desktop\Optical_System\GUI\.venv\Scripts\python.exe -m pip install .
 ```
 
+如果电脑安装了多个 MATLAB 版本，请务必进入希望使用的那个版本的
+`extern\engines\python` 目录执行安装。GUI 会校验启动后的 `matlabroot`
+是否与手动选择的 MATLAB 目录一致；如果不一致，需要重新安装对应版本的
+MATLAB Engine，或选择与当前 `matlab.engine` 匹配的 MATLAB 版本。
+
 安装后检查：
 
 ```powershell

@@ -79,6 +79,8 @@ function ws = GUI_RunWorkspaceComponent(componentName, matlabFunctionName, input
                 ws = runElectricalAnalyzer(ws, Params);
             case contains(key, 'powermeter') || contains(key, 'analyzer')
                 ws = runPowerMeter(ws, fn, Params);
+            case contains(key, 'matlabfile') || contains(key, 'externalmatlab')
+                ws = runExternalMatlabFile(ws, Params);
             otherwise
                 ws.Status = 'pass_through';
                 ws.Message = 'No component adapter matched; upstream workspace passed through.';
@@ -427,6 +429,73 @@ function ws = runPowerMeter(ws, fn, Params)
     if isempty(e), ws = waitFor(ws, 'signal field'); return; end
     [ws.Power_dBm, ws.Power_Watts] = feval(fn, e);
     ws.PowerMeterKind = 'optical';
+    ws.Status = 'called';
+end
+
+function ws = runExternalMatlabFile(ws, Params)
+    matlabFile = charParam(ws.GUIParams, 'MatlabFile', '');
+    functionName = charParam(ws.GUIParams, 'FunctionName', '');
+    addToPath = boolParam(ws.GUIParams, 'AddToPath', true) > 0;
+    mergeOutput = boolParam(ws.GUIParams, 'MergeOutput', true) > 0;
+    nargoutValue = max(0, round(getParam(ws.GUIParams, 'Nargout', 1)));
+
+    if isempty(functionName)
+        if isempty(matlabFile)
+            ws = waitFor(ws, 'MatlabFile or FunctionName');
+            return;
+        end
+        [folderPath, functionName, ext] = fileparts(matlabFile);
+        if ~strcmpi(ext, '.m')
+            ws.Status = 'call_failed';
+            ws.Error = 'MatlabFile must point to a .m file.';
+            return;
+        end
+        if ~exist(matlabFile, 'file')
+            ws.Status = 'call_failed';
+            ws.Error = ['External MATLAB file not found: ', matlabFile];
+            return;
+        end
+        if addToPath && ~isempty(folderPath)
+            addpath(folderPath);
+        end
+    end
+
+    if isempty(functionName)
+        ws = waitFor(ws, 'FunctionName');
+        return;
+    end
+    if exist(functionName, 'file') ~= 2
+        ws.Status = 'call_failed';
+        ws.Error = ['External MATLAB function not found on path: ', functionName];
+        return;
+    end
+
+    ws.ExternalMatlabFunction = functionName;
+    ws.ExternalMatlabFile = matlabFile;
+    switch nargoutValue
+        case 0
+            feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            ws.Status = 'called';
+        case 1
+            out = feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            ws = applyExternalMatlabOutput(ws, out, mergeOutput);
+        otherwise
+            tmp = cell(1, nargoutValue);
+            [tmp{:}] = feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            ws.ExternalOutputs = tmp;
+            if mergeOutput && ~isempty(tmp)
+                ws = applyExternalMatlabOutput(ws, tmp{1}, true);
+            else
+                ws.Status = 'called';
+            end
+    end
+end
+
+function ws = applyExternalMatlabOutput(ws, out, mergeOutput)
+    ws.ExternalOutput = out;
+    if mergeOutput && isstruct(out)
+        ws = mergeStructFields(ws, out);
+    end
     ws.Status = 'called';
 end
 
@@ -918,6 +987,21 @@ function val = getParamAny(s, names, defaultVal)
             val = getParam(s, names{k}, defaultVal);
             return;
         end
+    end
+end
+
+function val = charParam(s, name, defaultVal)
+    val = defaultVal;
+    if ~isstruct(s) || ~isfield(s, name)
+        return;
+    end
+    raw = s.(name);
+    if ischar(raw)
+        val = strtrim(raw);
+    elseif isstring(raw)
+        val = strtrim(char(raw));
+    elseif isnumeric(raw) || islogical(raw)
+        val = num2str(raw);
     end
 end
 

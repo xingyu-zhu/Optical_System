@@ -37,6 +37,9 @@ COMPONENT_GROUPS = {
         ("E-Analyzer", "Analyzer.png"),
         ("PowerMeter", "OPM.jpg"),
     ],
+    "自定义": [
+        ("MatlabFile", "Scope.jpg"),
+    ],
 }
 
 ICON_ALIASES = {
@@ -44,6 +47,8 @@ ICON_ALIASES = {
     "edfa": "OA.jpg",
     "laser": "laser.png",
     "opm": "OPM.jpg",
+    "externalmatlab": "Scope.jpg",
+    "matlabfile": "Scope.jpg",
     "polrot": "RotatePol.jpg",
     "rotatepol": "RotatePol.jpg",
     "rxdsp": "Rx_DSP.png",
