@@ -13,13 +13,25 @@ The GUI includes a `MatlabFile` component for calling user-provided `.m` files.
 Set `MatlabFile` to the external file path, or set `FunctionName` directly if
 the function is already on the MATLAB path.
 
-Recommended function signature:
+Legacy function signature:
 
 ```matlab
 function out = my_custom_component(ws, Params, guiParams, context)
 ```
 
-Return a struct to merge fields back into the current workspace.
+You can also put a call expression in `FunctionName`:
+
+```matlab
+[out_a, out_b]=your_function(arg_a, arg_b)
+```
+
+This is a template: replace `your_function` with the exact function name in
+the selected `.m` file, replace `arg_a`/`arg_b` with parameters or upstream
+workspace fields, and replace `out_a`/`out_b` with the output names you want to
+pass downstream. Arguments are resolved from inherited upstream `Params`, GUI
+parameters, then upstream workspace fields. Named outputs become workspace
+fields for downstream components, and the arguments resolved from parameters are
+stored in `ExternalCallParams` and merged back into `Params`.
 
 ## Kept structure
 

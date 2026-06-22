@@ -55,6 +55,7 @@ class MatlabTopologyRunner:
 
     def _run_once(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
         executor = TopologyExecutor(topology)
+        global_params = self._to_matlab_params(topology.get("global_params") or {})
         node_contexts = self._build_node_contexts(executor)
         _, _, incoming_edges, outgoing_edges = executor._build_graph()
         remaining_cache_consumers = {
@@ -72,8 +73,9 @@ class MatlabTopologyRunner:
             node_context = node_contexts[node.node_id]
 
             matlab_inputs = self._to_matlab_inputs(inputs_by_port)
-            matlab_params = self._to_matlab_params(node.params or {})
+            matlab_params = self._to_matlab_params(node.params or {}, global_params)
             node_context["return_lightweight"] = True
+            node_context["global_params"] = global_params
             outputs = self._feval_interruptible(
                 eng,
                 "GUI_RunWorkspaceComponent",
@@ -961,12 +963,35 @@ class MatlabTopologyRunner:
             if not key.startswith("__")
         }
 
-    def _to_matlab_params(self, params: dict[str, Any]) -> dict[str, Any]:
+    def _to_matlab_params(
+        self,
+        params: dict[str, Any],
+        global_params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         converted: dict[str, Any] = {}
         for key, value in params.items():
             safe_key = self._safe_matlab_field(key)
-            converted[safe_key] = self._param_value(value)
+            converted[safe_key] = self._resolve_global_param_reference(
+                self._param_value(value), global_params or {}
+            )
         return converted
+
+    def _resolve_global_param_reference(
+        self, value: Any, global_params: dict[str, Any]
+    ) -> Any:
+        if not isinstance(value, str) or not global_params:
+            return value
+
+        text = value.strip()
+        if len(text) >= 2 and text[0] == "{" and text[-1] == "}":
+            return global_params.get(self._safe_matlab_field(text[1:-1].strip()), value)
+        if text.startswith("$") and len(text) > 1:
+            return global_params.get(self._safe_matlab_field(text[1:].strip()), value)
+
+        safe_key = self._safe_matlab_field(text)
+        if safe_key in global_params:
+            return global_params[safe_key]
+        return value
 
     @staticmethod
     def _param_value(value: Any) -> Any:

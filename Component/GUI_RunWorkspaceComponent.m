@@ -434,17 +434,14 @@ end
 
 function ws = runExternalMatlabFile(ws, Params)
     matlabFile = charParam(ws.GUIParams, 'MatlabFile', '');
-    functionName = charParam(ws.GUIParams, 'FunctionName', '');
+    callSpec = charParam(ws.GUIParams, 'FunctionName', '');
     addToPath = boolParam(ws.GUIParams, 'AddToPath', true) > 0;
     mergeOutput = boolParam(ws.GUIParams, 'MergeOutput', true) > 0;
     nargoutValue = max(0, round(getParam(ws.GUIParams, 'Nargout', 1)));
+    fileFunctionName = '';
 
-    if isempty(functionName)
-        if isempty(matlabFile)
-            ws = waitFor(ws, 'MatlabFile or FunctionName');
-            return;
-        end
-        [folderPath, functionName, ext] = fileparts(matlabFile);
+    if ~isempty(matlabFile)
+        [folderPath, fileFunctionName, ext] = fileparts(matlabFile);
         if ~strcmpi(ext, '.m')
             ws.Status = 'call_failed';
             ws.Error = 'MatlabFile must point to a .m file.';
@@ -458,30 +455,62 @@ function ws = runExternalMatlabFile(ws, Params)
         if addToPath && ~isempty(folderPath)
             addpath(folderPath);
         end
+    elseif isempty(callSpec)
+        ws = waitFor(ws, 'MatlabFile or FunctionName');
+        return;
     end
 
-    if isempty(functionName)
+    if isempty(callSpec)
+        callSpec = fileFunctionName;
+    end
+
+    spec = parseExternalMatlabCall(callSpec);
+    if isempty(spec.FunctionName)
         ws = waitFor(ws, 'FunctionName');
         return;
     end
-    if exist(functionName, 'file') ~= 2
+
+    if ~isempty(fileFunctionName) && ~strcmp(spec.FunctionName, fileFunctionName)
         ws.Status = 'call_failed';
-        ws.Error = ['External MATLAB function not found on path: ', functionName];
+        ws.Error = sprintf('FunctionName "%s" must exactly match file function "%s".', spec.FunctionName, fileFunctionName);
+        return;
+    end
+    if exist(spec.FunctionName, 'file') ~= 2
+        ws.Status = 'call_failed';
+        ws.Error = ['External MATLAB function not found on path: ', spec.FunctionName];
         return;
     end
 
-    ws.ExternalMatlabFunction = functionName;
+    ws.ExternalMatlabFunction = spec.FunctionName;
+    ws.ExternalMatlabCall = callSpec;
     ws.ExternalMatlabFile = matlabFile;
+
+    if spec.HasExplicitCall
+        [args, usedParams] = resolveExternalMatlabArgs(spec.InputNames, ws, Params);
+        nargoutValue = numel(spec.OutputNames);
+        tmp = cell(1, nargoutValue);
+        if nargoutValue == 0
+            feval(spec.FunctionName, args{:});
+        else
+            [tmp{:}] = feval(spec.FunctionName, args{:});
+        end
+        ws = applyExternalMatlabNamedOutputs(ws, spec.OutputNames, tmp, usedParams, mergeOutput);
+        return;
+    end
+
     switch nargoutValue
         case 0
-            feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            feval(spec.FunctionName, ws, Params, ws.GUIParams, ws.Context);
+            ws.ExternalCallParams = Params;
             ws.Status = 'called';
         case 1
-            out = feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            out = feval(spec.FunctionName, ws, Params, ws.GUIParams, ws.Context);
+            ws.ExternalCallParams = Params;
             ws = applyExternalMatlabOutput(ws, out, mergeOutput);
         otherwise
             tmp = cell(1, nargoutValue);
-            [tmp{:}] = feval(functionName, ws, Params, ws.GUIParams, ws.Context);
+            [tmp{:}] = feval(spec.FunctionName, ws, Params, ws.GUIParams, ws.Context);
+            ws.ExternalCallParams = Params;
             ws.ExternalOutputs = tmp;
             if mergeOutput && ~isempty(tmp)
                 ws = applyExternalMatlabOutput(ws, tmp{1}, true);
@@ -489,6 +518,164 @@ function ws = runExternalMatlabFile(ws, Params)
                 ws.Status = 'called';
             end
     end
+end
+
+function spec = parseExternalMatlabCall(callSpec)
+    spec = struct('FunctionName', '', 'InputNames', {{}}, 'OutputNames', {{}}, 'HasExplicitCall', false);
+    text = strtrim(char(callSpec));
+    if isempty(text)
+        return;
+    end
+
+    simpleName = regexp(text, '^[A-Za-z]\w*$', 'match', 'once');
+    if ~isempty(simpleName)
+        spec.FunctionName = simpleName;
+        return;
+    end
+
+    outputText = '';
+    rhs = text;
+    equalsAt = strfind(text, '=');
+    if ~isempty(equalsAt)
+        outputText = strtrim(text(1:equalsAt(1)-1));
+        rhs = strtrim(text(equalsAt(1)+1:end));
+    end
+
+    expr = regexp(rhs, '^(?<functionName>[A-Za-z]\w*)\s*\((?<inputs>.*)\)\s*$', 'names', 'once');
+    if isempty(expr)
+        error('Invalid FunctionName expression. Use function_name or [out1, out2]=function_name(param1, param2).');
+    end
+
+    spec.FunctionName = expr.functionName;
+    spec.InputNames = splitExternalMatlabNames(expr.inputs, true);
+    if ~isempty(outputText)
+        if startsWith(outputText, '[') && endsWith(outputText, ']')
+            spec.OutputNames = splitExternalMatlabNames(outputText(2:end-1), false);
+        elseif ~isempty(regexp(outputText, '^[A-Za-z]\w*$', 'once'))
+            spec.OutputNames = {outputText};
+        else
+            error('Invalid external MATLAB output list: %s', outputText);
+        end
+    end
+    spec.HasExplicitCall = true;
+end
+
+function names = splitExternalMatlabNames(text, allowLiterals)
+    text = strtrim(char(text));
+    names = {};
+    if isempty(text)
+        return;
+    end
+    parts = regexp(text, '\s*,\s*', 'split');
+    for k = 1:numel(parts)
+        name = strtrim(parts{k});
+        if isempty(name)
+            continue;
+        end
+        if allowLiterals && isExternalMatlabLiteral(name)
+            names{end+1} = name; %#ok<AGROW>
+            continue;
+        end
+        if isempty(regexp(name, '^[A-Za-z]\w*$', 'once'))
+            error('Invalid external MATLAB identifier: %s', name);
+        end
+        names{end+1} = name; %#ok<AGROW>
+    end
+end
+
+function tf = isExternalMatlabLiteral(text)
+    text = strtrim(char(text));
+    tf = ~isempty(regexp(text, '^(''.*''|".*"|[-+]?\d+(\.\d+)?([eE][-+]?\d+)?|true|false)$', 'once'));
+end
+
+function [args, usedParams] = resolveExternalMatlabArgs(inputNames, ws, Params)
+    args = cell(1, numel(inputNames));
+    usedParams = struct();
+    for k = 1:numel(inputNames)
+        [args{k}, usedParams] = resolveExternalMatlabArg(inputNames{k}, ws, Params, usedParams);
+    end
+end
+
+function [value, usedParams] = resolveExternalMatlabArg(name, ws, Params, usedParams)
+    originalName = strtrim(char(name));
+    lowerName = lower(originalName);
+    if isExternalMatlabLiteral(originalName)
+        value = parseExternalMatlabLiteral(originalName);
+        return;
+    end
+
+    switch lowerName
+        case 'ws'
+            value = ws;
+            return;
+        case 'params'
+            value = Params;
+            usedParams = mergeStructFields(usedParams, Params);
+            return;
+        case {'guiparams', 'gui_params'}
+            value = ws.GUIParams;
+            return;
+        case 'context'
+            value = ws.Context;
+            return;
+        case 'inputs'
+            value = ws.Inputs;
+            return;
+    end
+
+    if isstruct(Params) && isfield(Params, originalName)
+        value = Params.(originalName);
+        usedParams.(originalName) = value;
+        return;
+    end
+    if isstruct(ws.GUIParams) && isfield(ws.GUIParams, originalName)
+        value = ws.GUIParams.(originalName);
+        usedParams.(originalName) = value;
+        return;
+    end
+    if isstruct(ws) && isfield(ws, originalName)
+        value = ws.(originalName);
+        return;
+    end
+
+    error('External MATLAB argument "%s" was not found in Params, GUIParams, or upstream workspace.', originalName);
+end
+
+function value = parseExternalMatlabLiteral(text)
+    text = strtrim(char(text));
+    if strcmpi(text, 'true')
+        value = true;
+    elseif strcmpi(text, 'false')
+        value = false;
+    elseif startsWith(text, '''') || startsWith(text, '"')
+        value = text(2:end-1);
+    else
+        value = str2double(text);
+    end
+end
+
+function ws = applyExternalMatlabNamedOutputs(ws, outputNames, outputs, usedParams, mergeOutput)
+    ws.ExternalOutputNames = outputNames;
+    ws.ExternalCallParams = usedParams;
+    ws.Params = mergeStructFields(ws.Params, usedParams);
+
+    namedOutputs = struct();
+    for k = 1:numel(outputNames)
+        name = outputNames{k};
+        value = outputs{k};
+        ws.(name) = value;
+        namedOutputs.(name) = value;
+        if mergeOutput && isstruct(value)
+            ws = mergeStructFields(ws, value);
+        end
+    end
+    ws.ExternalOutputs = namedOutputs;
+    if numel(outputs) == 1
+        ws.ExternalOutput = outputs{1};
+    else
+        ws.ExternalOutput = outputs;
+    end
+    ws.Status = 'called';
 end
 
 function ws = applyExternalMatlabOutput(ws, out, mergeOutput)
@@ -1735,6 +1922,13 @@ function compact = compactWorkspaceForCache(ws)
         compact = copyFields(compact, ws, {'AnalyzerSignal', 'AnalyzerConstellation', ...
             'AnalyzerSpectrumFrequencyGHz', 'AnalyzerSpectrumPSDdBHz', ...
             'AnalyzerOpticalFrequencyTHz', 'AnalyzerOpticalPowerdBm'});
+    elseif contains(key, 'matlabfile') || contains(key, 'externalmatlab')
+        compact = copyFields(compact, ws, {'ExternalMatlabFunction', 'ExternalMatlabCall', ...
+            'ExternalMatlabFile', 'ExternalOutput', 'ExternalOutputs', ...
+            'ExternalOutputNames', 'ExternalCallParams'});
+        if isfield(ws, 'ExternalOutputNames') && iscell(ws.ExternalOutputNames)
+            compact = copyFields(compact, ws, ws.ExternalOutputNames);
+        end
     end
 end
 

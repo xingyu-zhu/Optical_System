@@ -145,7 +145,11 @@ DEFAULT_COMPONENT_PARAMS: dict[str, dict[str, list[str]]] = {
     },
     "MatlabFile": {
         "MatlabFile": ["", "", "外部 .m 文件完整路径（可选）"],
-        "FunctionName": ["", "", "函数名（留空时由文件名推断）"],
+        "FunctionName": [
+            "",
+            "",
+            "函数名或调用表达式模板，如 [out_a, out_b]=your_function(arg_a, arg_b)",
+        ],
         "AddToPath": ["True", "", "运行前将文件目录加入 MATLAB 路径"],
         "Nargout": ["1", "", "外部函数输出数量"],
         "MergeOutput": ["True", "", "返回 struct 时合并到当前工作区"],
@@ -337,6 +341,86 @@ class ComponentParameterDialog(QDialog):
         )
 
 
+class GlobalParameterDialog(QDialog):
+    def __init__(self, params: dict[str, list[str]], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("编辑全局参数")
+        self.resize(680, 440)
+        self._params = params
+
+        layout = QVBoxLayout(self)
+
+        hint = QLabel("组件参数可使用 $参数名 或 {参数名} 引用全局参数。", self)
+        layout.addWidget(hint)
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["参数名", "值", "单位", "描述"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.table)
+
+        action_row = QHBoxLayout()
+        add_button = QPushButton("添加", self)
+        remove_button = QPushButton("删除选中", self)
+        add_button.clicked.connect(self._add_row)
+        remove_button.clicked.connect(self._remove_selected_rows)
+        action_row.addWidget(add_button)
+        action_row.addWidget(remove_button)
+        action_row.addStretch(1)
+        layout.addLayout(action_row)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._load_params()
+
+    def _load_params(self) -> None:
+        self.table.setRowCount(0)
+        for key, value in self._params.items():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self._set_row(row, key, value)
+
+    def _set_row(self, row: int, key: str, value: list[str]) -> None:
+        value_text = value[0] if len(value) > 0 else ""
+        unit = value[1] if len(value) > 1 else ""
+        desc = value[2] if len(value) > 2 else ""
+        self.table.setItem(row, 0, QTableWidgetItem(str(key)))
+        self.table.setItem(row, 1, QTableWidgetItem(str(value_text)))
+        self.table.setItem(row, 2, QTableWidgetItem(str(unit)))
+        self.table.setItem(row, 3, QTableWidgetItem(str(desc)))
+
+    def _add_row(self) -> None:
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self._set_row(row, "", ["", "", ""])
+        self.table.setCurrentCell(row, 0)
+
+    def _remove_selected_rows(self) -> None:
+        rows = sorted({item.row() for item in self.table.selectedItems()}, reverse=True)
+        for row in rows:
+            self.table.removeRow(row)
+
+    def get_params(self) -> dict[str, list[str]]:
+        params: dict[str, list[str]] = {}
+        for row in range(self.table.rowCount()):
+            key_item = self.table.item(row, 0)
+            key = key_item.text().strip() if key_item else ""
+            if not key:
+                continue
+            value = self._item_text(row, 1)
+            unit = self._item_text(row, 2)
+            desc = self._item_text(row, 3)
+            params[key] = [value, unit, desc]
+        return params
+
+    def _item_text(self, row: int, col: int) -> str:
+        item = self.table.item(row, col)
+        return item.text().strip() if item else ""
+
+
 class PortItem(QGraphicsEllipseItem):
     def __init__(self, parent_node: "NodeItem", kind: str, side: str):
         super().__init__(-5, -5, 10, 10, parent_node)
@@ -481,6 +565,7 @@ class TopologyScene(QGraphicsScene):
     topology_changed = pyqtSignal(int, int)
     design_changed = pyqtSignal()
     node_double_clicked = pyqtSignal(object)
+    background_double_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -490,6 +575,7 @@ class TopologyScene(QGraphicsScene):
         self._preview_line: QGraphicsLineItem | None = None
         self._press_node_positions: dict[NodeItem, QPointF] = {}
         self.sweep_config: list[dict] = []
+        self.global_params: dict[str, list[str]] = {}
 
     def dragMoveEvent(self, event) -> None:  # noqa: N802
         if event.mimeData().hasFormat("application/x-optical-component"):
@@ -550,7 +636,8 @@ class TopologyScene(QGraphicsScene):
             self._press_node_positions = {}
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
-        for item in self.items(event.scenePos()):
+        clicked_items = self.items(event.scenePos())
+        for item in clicked_items:
             if isinstance(item, NodeItem):
                 self.node_double_clicked.emit(item)
                 event.accept()
@@ -559,6 +646,10 @@ class TopologyScene(QGraphicsScene):
                 self.node_double_clicked.emit(item.parent_node)
                 event.accept()
                 return
+        if not clicked_items:
+            self.background_double_clicked.emit()
+            event.accept()
+            return
         super().mouseDoubleClickEvent(event)
 
     def _port_at(self, scene_pos: QPointF) -> PortItem | None:
@@ -751,11 +842,13 @@ class TopologyScene(QGraphicsScene):
             "nodes": nodes,
             "edges": edges,
             "parameter_sweeps": list(self.sweep_config),
+            "global_params": self._copy_params(self.global_params),
         }
 
     def deserialize(self, data: dict) -> None:
         self.clear()
         self.sweep_config = list(data.get("parameter_sweeps", []))
+        self.global_params = self._merge_global_params(data.get("global_params", {}))
 
         id_to_node: dict[int, NodeItem] = {}
         nodes_data = data.get("nodes", [])
@@ -836,6 +929,19 @@ class TopologyScene(QGraphicsScene):
         self._renumber_nodes_contiguously()
         self._sync_next_id()
         self._emit_counts()
+
+    @staticmethod
+    def _merge_global_params(params: dict | None) -> dict[str, list[str]]:
+        merged: dict[str, list[str]] = {}
+        for key, value in (params or {}).items():
+            if not key:
+                continue
+            merged[str(key)] = (
+                list(value) if isinstance(value, list) else [str(value), "", ""]
+            )
+            while len(merged[str(key)]) < 3:
+                merged[str(key)].append("")
+        return merged
 
     def _refresh_node_display_names(self) -> None:
         nodes = [item for item in self.items() if isinstance(item, NodeItem)]
@@ -980,6 +1086,7 @@ class WorkspacePanel(QWidget):
         self.scene.topology_changed.connect(self.topology_changed.emit)
         self.scene.design_changed.connect(self.design_changed.emit)
         self.scene.node_double_clicked.connect(self._edit_node_parameters)
+        self.scene.background_double_clicked.connect(self._edit_global_parameters)
 
         self.view = WorkspaceView(self.scene, self)
         self.view.delete_requested.connect(self.delete_selected)
@@ -1030,6 +1137,12 @@ class WorkspacePanel(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             node.meta.params = dialog.get_params()
             self.node_parameter_updated.emit(node.node_id, node.meta.params)
+            self.design_changed.emit()
+
+    def _edit_global_parameters(self) -> None:
+        dialog = GlobalParameterDialog(self.scene.global_params, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.scene.global_params = dialog.get_params()
             self.design_changed.emit()
 
     def delete_selected(self) -> None:
