@@ -1113,6 +1113,12 @@ function Params = applyGuiComponentParams(Params, guiParams)
     Params.Opt.Obj.Tx.MZM.Vpi = vpi;
     Params.Opt.Obj.Tx.MZM.VpiDC = vpi;
     Params.Opt.Obj.Tx.MZM.Bandwidth = ghzParam(guiParams, {'Bandwidth'}, 35e9);
+    bandwidthModel = getParamAny(guiParams, {'BandwidthModel'}, 'IdealBessel');
+    bandwidthDatasetPath = getParamAny(guiParams, {'BandwidthDatasetPath'}, '');
+    bandwidthDatasetId = getParamAny(guiParams, {'BandwidthDatasetId'}, '');
+    Params.Opt.Obj.Tx.MZM.BandwidthModel = char(bandwidthModel);
+    Params.Opt.Obj.Tx.MZM.BandwidthDatasetPath = char(bandwidthDatasetPath);
+    Params.Opt.Obj.Tx.MZM.BandwidthDatasetId = char(bandwidthDatasetId);
 
     Params.Opt.Obj.EmissionFrequency = thzParam(guiParams, {'TransmitFrequency', 'EmissionFrequency'}, 193.1e12);
     ampMode = lower(char(getParamAny(guiParams, {'Mode', 'ControlMode'}, 'OutputPower')));
@@ -1141,6 +1147,9 @@ function Params = applyGuiComponentParams(Params, guiParams)
     Params.Opt.Obj.VOA.Active = 'On';
 
     Params.Opt.Obj.Rx.PD.BandWidth = ghzParam(guiParams, {'Bandwidth'}, safeGet(Params.Opt.Obj.Rx.PD, {'BandWidth'}, 25e9));
+    Params.Opt.Obj.Rx.PD.BandwidthModel = char(bandwidthModel);
+    Params.Opt.Obj.Rx.PD.BandwidthDatasetPath = char(bandwidthDatasetPath);
+    Params.Opt.Obj.Rx.PD.BandwidthDatasetId = char(bandwidthDatasetId);
     Params.Opt.Obj.Rx.PD.Responsivity = getParam(guiParams, 'Responsivity', safeGet(Params.Opt.Obj.Rx.PD, {'Responsivity'}, 0.6));
     Params.Opt.Obj.Rx.PD.AddThermalNoise = boolParam(guiParams, 'ThermalNoise', safeGet(Params.Opt.Obj.Rx.PD, {'AddThermalNoise'}, 1));
     Params.Opt.Obj.Rx.PD.AddShotNoise = boolParam(guiParams, 'ShotNoise', safeGet(Params.Opt.Obj.Rx.PD, {'AddShotNoise'}, 1));

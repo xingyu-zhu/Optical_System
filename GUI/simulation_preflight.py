@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from matlab_component_registry import matlab_function_for_component
+from measurement_dataset import MeasurementDatasetCatalog
 from topology_executor import TopologyExecutor
 
 
@@ -29,7 +30,11 @@ class PreflightReport:
         return "\n".join(lines)
 
 
-def run_preflight(topology: dict[str, Any], offline: bool = False) -> PreflightReport:
+def run_preflight(
+    topology: dict[str, Any],
+    offline: bool = False,
+    dataset_catalog: MeasurementDatasetCatalog | None = None,
+) -> PreflightReport:
     report = PreflightReport()
     nodes = topology.get("nodes", [])
     edges = topology.get("edges", [])
@@ -45,6 +50,8 @@ def run_preflight(topology: dict[str, Any], offline: bool = False) -> PreflightR
         return report
 
     connected: set[int] = set()
+    dataset_catalog = dataset_catalog or MeasurementDatasetCatalog()
+    measured_count = 0
     for edge in edges:
         try:
             connected.update((int(edge["source_id"]), int(edge["target_id"])))
@@ -61,6 +68,10 @@ def run_preflight(topology: dict[str, Any], offline: bool = False) -> PreflightR
             report.warnings.append(f"节点 {node_id}（{name}）未连接。")
         if "matlabfile" in "".join(ch.lower() for ch in name if ch.isalnum()):
             _check_external_component(report, node_id, raw.get("params") or {})
+        model_config = raw.get("model_config") or {}
+        if str(model_config.get("BandwidthModel", "IdealBessel")).lower() == "measured":
+            measured_count += 1
+            _check_measurement_dataset(report, dataset_catalog, node_id, name, model_config)
 
     enabled_sweeps = [item for item in topology.get("parameter_sweeps", []) if item.get("enabled", True)]
     node_ids = {int(node.get("id", 0)) for node in nodes}
@@ -80,6 +91,8 @@ def run_preflight(topology: dict[str, Any], offline: bool = False) -> PreflightR
             report.errors.append(f"参数扫描配置无效: {exc}")
     if enabled_sweeps:
         report.checks.append(f"已校验 {len(enabled_sweeps)} 个启用的扫描轴。")
+    if measured_count:
+        report.checks.append(f"已校验 {measured_count} 个实测带宽模型及其四通道数据。")
     if offline:
         report.warnings.append("当前为离线模式；可编辑和预检查，但不能运行 MATLAB 仿真。")
     return report
@@ -94,6 +107,28 @@ def _check_external_component(report: PreflightReport, node_id: int, params: dic
         report.errors.append(f"外部 MATLAB 节点 {node_id} 的文件不存在或不是 .m 文件: {file_path}")
     if not function_name:
         report.errors.append(f"外部 MATLAB 节点 {node_id} 未设置函数名。")
+
+
+def _check_measurement_dataset(
+    report: PreflightReport,
+    catalog: MeasurementDatasetCatalog,
+    node_id: int,
+    name: str,
+    model_config: dict[str, Any],
+) -> None:
+    dataset_id = str(model_config.get("BandwidthDataset", "")).strip()
+    if not dataset_id:
+        report.errors.append(f"节点 {node_id}（{name}）已选择实测模型，但未指定数据集。")
+        return
+    try:
+        dataset = catalog.get(dataset_id)
+    except Exception as exc:
+        report.errors.append(f"节点 {node_id}（{name}）的实测数据集不可用: {exc}")
+        return
+    normalized = "".join(ch.lower() for ch in name if ch.isalnum())
+    expected = "modulator" if "modulator" in normalized else "receiver"
+    if dataset.get("device_type") != expected:
+        report.errors.append(f"节点 {node_id}（{name}）的数据集设备类型不匹配。")
 
 
 def _value(value: Any) -> Any:

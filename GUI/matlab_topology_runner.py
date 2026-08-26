@@ -22,6 +22,7 @@ from matlab_component_registry import (
     matlab_function_for_component,
 )
 from matlab_engine_manager import MatlabEngineManager
+from measurement_dataset import MeasurementDatasetCatalog
 from simulation_artifacts import SweepCheckpoint, topology_signature
 from topology_display import (
     build_component_display_names,
@@ -53,6 +54,7 @@ class MatlabTopologyRunner:
         self.cancel_event = cancel_event
         self.pause_event = pause_event
         self.checkpoint_path = Path(checkpoint_path) if checkpoint_path else None
+        self.dataset_catalog = MeasurementDatasetCatalog()
 
     def run(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
         self._raise_if_cancelled()
@@ -81,6 +83,9 @@ class MatlabTopologyRunner:
                     manage_cache=manage_cache,
                 )
         executor = TopologyExecutor(topology)
+        display_names = build_component_display_names(
+            topology.get("nodes", []), separator=""
+        )
         global_params = self._to_matlab_params(topology.get("global_params") or {})
         node_contexts = self._build_node_contexts(executor)
         _, _, incoming_edges, outgoing_edges = executor._build_graph()
@@ -100,7 +105,9 @@ class MatlabTopologyRunner:
             node_context = node_contexts[node.node_id]
 
             matlab_inputs = self._to_matlab_inputs(inputs_by_port)
-            matlab_params = self._to_matlab_params(node.params or {}, global_params)
+            runtime_params = copy.deepcopy(node.params or {})
+            runtime_params.update(self._measurement_runtime_params(node))
+            matlab_params = self._to_matlab_params(runtime_params, global_params)
             node_context["return_lightweight"] = True
             node_context["global_params"] = global_params
             outputs = self._feval_interruptible(
@@ -116,7 +123,11 @@ class MatlabTopologyRunner:
             self._raise_if_cancelled()
             self._close_hidden_matlab_figures(eng)
             result = dict(outputs)
-            self._log_workspace_status(node, result)
+            self._log_workspace_status(
+                node,
+                result,
+                display_names.get(node.node_id, node.name),
+            )
             if not retain_cache:
                 for edge in incoming_edges.get(node.node_id, []):
                     remaining_cache_consumers[edge.source_id] = max(
@@ -148,6 +159,27 @@ class MatlabTopologyRunner:
         finally:
             if manage_cache:
                 self._cleanup_matlab_after_run(eng)
+
+    def _measurement_runtime_params(self, node: Node) -> dict[str, Any]:
+        config = node.model_config or {}
+        if not config:
+            return {}
+        if str(config.get("BandwidthModel", "IdealBessel")).lower() != "measured":
+            return {
+                "BandwidthModel": "IdealBessel",
+                "BandwidthDatasetId": "",
+                "BandwidthDatasetPath": "",
+            }
+        dataset_id = str(config.get("BandwidthDataset", "")).strip()
+        dataset = self.dataset_catalog.get(dataset_id)
+        expected = "modulator" if "modulator" in node.name.lower() else "receiver"
+        if dataset.get("device_type") != expected:
+            raise ValueError(f"节点 {node.node_id} 的实测数据集设备类型不匹配。")
+        return {
+            "BandwidthModel": "Measured",
+            "BandwidthDatasetId": dataset_id,
+            "BandwidthDatasetPath": str(self.dataset_catalog.dataset_path(dataset_id)),
+        }
 
     def _run_parameter_sweep(
         self, topology: dict[str, Any], sweep: dict[str, Any]
@@ -882,20 +914,25 @@ class MatlabTopologyRunner:
         except Exception:
             return None
 
-    def _log_workspace_status(self, node: Node, workspace: dict[str, Any]) -> None:
+    def _log_workspace_status(
+        self,
+        node: Node,
+        workspace: dict[str, Any],
+        display_name: str,
+    ) -> None:
         status = workspace.get("Status")
         if not status:
             return
         if status == "called":
-            message = f"组件 {node.name} 已正确运行"
+            message = f"组件 {display_name} 已正确运行"
         elif status == "waiting_for_inputs":
             detail = workspace.get("WaitingFor")
-            message = f"组件 {node.name} 等待输入" + (f": {detail}" if detail else "")
+            message = f"组件 {display_name} 等待输入" + (f": {detail}" if detail else "")
         elif status in {"call_failed", "failed"}:
             detail = workspace.get("Error")
-            message = f"组件 {node.name} 运行失败" + (f": {detail}" if detail else "")
+            message = f"组件 {display_name} 运行失败" + (f": {detail}" if detail else "")
         else:
-            message = f"组件 {node.name} 状态: {status}"
+            message = f"组件 {display_name} 状态: {status}"
         self.log(message, "MATLAB")
 
     def _log_final_metrics(

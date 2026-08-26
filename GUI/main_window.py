@@ -31,6 +31,8 @@ from external_matlab_wizard import ExternalMatlabWizard
 from matlab_diagnostics_dialog import MatlabDiagnosticsDialog
 from matlab_engine_manager import MatlabEngineManager
 from matlab_topology_runner import MatlabTopologyRunner, SimulationCancelled
+from measured_bandwidth_dialog import MeasuredBandwidthManagerDialog
+from measurement_dataset import MeasurementDatasetCatalog
 from output_widget import OutputWidget
 from parameter_sweep_dialog import ParameterSweepDialog
 from signal_plotter import _as_array
@@ -133,6 +135,7 @@ class MainWindow(QMainWindow):
     ):
         super().__init__(parent)
         self.engine_manager = engine_manager
+        self.measurement_catalog = MeasurementDatasetCatalog()
         self.offline_mode = bool(offline_mode)
         self._simulation_worker = None
         self._shutdown_worker = None
@@ -177,7 +180,11 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(splitter, 1)
 
         self.component_panel = ComponentPanel(self)
-        self.workspace_panel = WorkspacePanel(self)
+        self.workspace_panel = WorkspacePanel(
+            self,
+            measurement_catalog=self.measurement_catalog,
+            measurement_cache_clear=self._clear_measurement_cache,
+        )
 
         message_container = QWidget(self)
         message_layout = QVBoxLayout(message_container)
@@ -280,6 +287,9 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(self._make_action("仿真预检查", None, self._show_preflight))
         tools_menu.addAction(self._make_action("MATLAB 诊断", None, self._show_matlab_diagnostics))
         tools_menu.addAction(
+            self._make_action("实测带宽数据集", None, self._show_measured_bandwidth_manager)
+        )
+        tools_menu.addAction(
             self._make_action(
                 "外部 MATLAB 组件向导", None, self._show_external_matlab_wizard
             )
@@ -288,6 +298,13 @@ class MainWindow(QMainWindow):
         self.offline_action.setCheckable(True)
         self.offline_action.setChecked(self.offline_mode)
         tools_menu.addAction(self.offline_action)
+        tools_menu.addSeparator()
+        tools_menu.addAction(
+            self._make_action("恢复全部默认参数", None, self._restore_all_default_parameters)
+        )
+        tools_menu.addAction(
+            self._make_action("重置软件状态", None, self._reset_software_state)
+        )
 
     def _create_tool_bars(self) -> None:
         file_tb = QToolBar("文件", self)
@@ -633,10 +650,13 @@ class MainWindow(QMainWindow):
         topology = self.workspace_panel.scene.serialize()
         try:
             executor = TopologyExecutor(topology)
+            display_names = build_component_display_names(
+                topology.get("nodes", []), separator=""
+            )
             levels = executor.topological_levels()
             self.output_widget.append_message("Design execution plan:", source="INFO")
             for i, level in enumerate(levels, start=1):
-                names = [executor.nodes[nid].name for nid in level]
+                names = [display_names.get(nid, executor.nodes[nid].name) for nid in level]
                 self.output_widget.append_message(
                     f"L{i}: {list(zip(level, names))}", source="INFO"
                 )
@@ -646,7 +666,7 @@ class MainWindow(QMainWindow):
                     k for k in inputs_by_port.keys() if not k.startswith("__")
                 )
                 self.output_widget.append_message(
-                    f"Run node {node.node_id} ({node.name}), inputs={ports}",
+                    f"Run component {display_names.get(node.node_id, node.name)}, inputs={ports}",
                     source="PYTHON",
                 )
                 return {"default": f"signal_from_{node.name}"}
@@ -751,7 +771,63 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "仿真预检查", report.to_text())
 
     def _show_matlab_diagnostics(self) -> None:
-        MatlabDiagnosticsDialog(self.engine_manager, self).exec_()
+        MatlabDiagnosticsDialog(self.engine_manager, self.measurement_catalog, self).exec_()
+
+    def _show_measured_bandwidth_manager(self) -> None:
+        MeasuredBandwidthManagerDialog(
+            self.workspace_panel,
+            self.measurement_catalog,
+            cache_clear=self._clear_measurement_cache,
+            parent=self,
+        ).exec_()
+
+    def _clear_measurement_cache(self) -> None:
+        if not self.engine_manager.is_running():
+            return
+        try:
+            self.engine_manager.eval(
+                "clear LoadMeasuredBandwidthDataset ApplyMeasuredBandwidthResponse;",
+                nargout=0,
+            )
+        except Exception as exc:
+            self.output_widget.append_message(f"清理实测响应缓存失败: {exc}", source="ERROR")
+
+    def _restore_all_default_parameters(self) -> None:
+        if QMessageBox.question(
+            self,
+            "恢复全部默认参数",
+            "恢复所有组件的代码默认参数，并停用实测数据集和参数扫描？拓扑布局与数据集文件会保留。",
+        ) != QMessageBox.Yes:
+            return
+        self.workspace_panel.restore_all_defaults()
+        self._clear_measurement_cache()
+        self.status_label.setText("已恢复全部默认参数")
+
+    def _reset_software_state(self) -> None:
+        if self._simulation_worker is not None and self._simulation_worker.isRunning():
+            QMessageBox.information(self, "重置软件状态", "请先停止当前仿真。")
+            return
+        if QMessageBox.question(
+            self,
+            "重置软件状态",
+            "恢复代码默认参数、停用实测模型与扫描，并清除当前运行结果？拓扑布局和数据集文件会保留。",
+        ) != QMessageBox.Yes:
+            return
+        self.workspace_panel.restore_all_defaults()
+        self._latest_topology = None
+        self._latest_outputs = {}
+        for window in self._analysis_windows:
+            try:
+                window.close()
+            except Exception:
+                pass
+        self._analysis_windows = []
+        self._clear_measurement_cache()
+        try:
+            self.engine_manager.cleanup_workspace()
+        except Exception as exc:
+            self.output_widget.append_message(f"清理 MATLAB 工作区失败: {exc}", source="ERROR")
+        self.status_label.setText("软件状态已重置")
 
     def _show_external_matlab_wizard(self) -> None:
         dialog = ExternalMatlabWizard(self)
@@ -815,10 +891,34 @@ class MainWindow(QMainWindow):
                 topology,
                 self._latest_outputs,
                 self.engine_manager.diagnostics(),
+                measurement_datasets=self._measurement_records(topology),
             )
             self.output_widget.append_message(f"仿真可复现记录: {path}", source="INFO")
         except Exception as exc:
             self.output_widget.append_message(f"写入仿真记录失败: {exc}", source="ERROR")
+
+    def _measurement_records(self, topology: dict) -> list[dict]:
+        records = []
+        seen = set()
+        for node in topology.get("nodes", []):
+            config = node.get("model_config") or {}
+            if str(config.get("BandwidthModel", "")).lower() != "measured":
+                continue
+            dataset_id = str(config.get("BandwidthDataset", ""))
+            if not dataset_id or dataset_id in seen:
+                continue
+            seen.add(dataset_id)
+            dataset = self.measurement_catalog.get(dataset_id)
+            records.append(
+                {
+                    "id": dataset_id,
+                    "name": dataset.get("name"),
+                    "device_type": dataset.get("device_type"),
+                    "normalization": dataset.get("normalization"),
+                    "sources": dataset.get("sources", []),
+                }
+            )
+        return records
 
     def _on_topology_simulation_cancelled(self, message: str) -> None:
         self._simulation_worker = None

@@ -15,7 +15,25 @@ function [E_out] = Modulator_Module(E_Carrier, rf_in_x, rf_in_y, Params)
     VpiDC   = MZM_Obj.VpiDC;
 
     %% 1.5 Apply Modulator Bandwidth Limitation
-    if isfield(MZM_Obj, 'Bandwidth') && ~isempty(MZM_Obj.Bandwidth)
+    bandwidthModel = 'IdealBessel';
+    if isfield(MZM_Obj, 'BandwidthModel') && ~isempty(MZM_Obj.BandwidthModel)
+        bandwidthModel = char(MZM_Obj.BandwidthModel);
+    end
+    if strcmpi(bandwidthModel, 'Measured')
+        if ~isfield(MZM_Obj, 'BandwidthDatasetPath') || isempty(MZM_Obj.BandwidthDatasetPath)
+            error('OpticalSystem:MeasuredBandwidth:MissingDataset', ...
+                'The modulator measured-bandwidth model has no dataset path.');
+        end
+        Fs = Params.Fs_Tx;
+        rf_x_I = ApplyMeasuredBandwidthResponse(real(rf_in_x), Fs, ...
+            MZM_Obj.BandwidthDatasetPath, 'XI', 'modulator');
+        rf_x_Q = ApplyMeasuredBandwidthResponse(imag(rf_in_x), Fs, ...
+            MZM_Obj.BandwidthDatasetPath, 'XQ', 'modulator');
+        rf_y_I = ApplyMeasuredBandwidthResponse(real(rf_in_y), Fs, ...
+            MZM_Obj.BandwidthDatasetPath, 'YI', 'modulator');
+        rf_y_Q = ApplyMeasuredBandwidthResponse(imag(rf_in_y), Fs, ...
+            MZM_Obj.BandwidthDatasetPath, 'YQ', 'modulator');
+    elseif isfield(MZM_Obj, 'Bandwidth') && ~isempty(MZM_Obj.Bandwidth)
         BW = MZM_Obj.Bandwidth;
         Fs = Params.Fs_Tx;
         N = length(rf_in_x);
@@ -27,6 +45,15 @@ function [E_out] = Modulator_Module(E_Carrier, rf_in_x, rf_in_y, Params)
         
         rf_in_x = ifft(fft(rf_in_x) .* reshape(Hf, size(rf_in_x)));
         rf_in_y = ifft(fft(rf_in_y) .* reshape(Hf, size(rf_in_y)));
+        rf_x_I = real(rf_in_x);
+        rf_x_Q = imag(rf_in_x);
+        rf_y_I = real(rf_in_y);
+        rf_y_Q = imag(rf_in_y);
+    else
+        rf_x_I = real(rf_in_x);
+        rf_x_Q = imag(rf_in_x);
+        rf_y_I = real(rf_in_y);
+        rf_y_Q = imag(rf_in_y);
     end
 
     %% 2. Split Optical Carrier
@@ -38,12 +65,7 @@ function [E_out] = Modulator_Module(E_Carrier, rf_in_x, rf_in_y, Params)
 
     %% 3. Prepare Electrical Signals
     % X-Pol Arms
-    rf_x_I = real(rf_in_x);
-    rf_x_Q = imag(rf_in_x);
-    
-    % Y-Pol Arms
-    rf_y_I = real(rf_in_y);
-    rf_y_Q = imag(rf_in_y);
+    % The four electrical lanes were prepared by the selected bandwidth model.
 
     %% 4. Calculate Bias (Null Point)
     % Bias = -Vpi - j*Vpi (Standard for Null Point / Carrier Suppression)

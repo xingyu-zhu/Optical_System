@@ -177,8 +177,6 @@ class MatlabEngineManager:
         self._configure_direct_engine_import_path_for_development(roots)
 
     def _configure_preferred_engine_import_path(self) -> None:
-        if getattr(sys, "frozen", False):
-            return
         root = self._preferred_matlab_root()
         if root is None:
             return
@@ -219,6 +217,17 @@ class MatlabEngineManager:
 
     @staticmethod
     def _clear_partial_matlab_imports() -> None:
+        engine_module = sys.modules.get("matlab.engine")
+        if engine_module is not None and all(
+            hasattr(engine_module, name)
+            for name in (
+                "start_matlab",
+                "connect_matlab",
+                "TimeoutError",
+                "CancelledError",
+            )
+        ):
+            return
         for name in list(sys.modules):
             if name == "matlab" or name.startswith("matlab."):
                 sys.modules.pop(name, None)

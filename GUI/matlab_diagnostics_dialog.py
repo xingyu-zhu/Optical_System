@@ -16,9 +16,10 @@ from PyQt5.QtWidgets import (
 
 
 class MatlabDiagnosticsDialog(QDialog):
-    def __init__(self, engine_manager, parent=None):
+    def __init__(self, engine_manager, measurement_catalog=None, parent=None):
         super().__init__(parent)
         self.engine_manager = engine_manager
+        self.measurement_catalog = measurement_catalog
         self.setWindowTitle("MATLAB 诊断")
         self.resize(760, 520)
         layout = QVBoxLayout(self)
@@ -43,6 +44,8 @@ class MatlabDiagnosticsDialog(QDialog):
 
     def refresh(self) -> None:
         info = self.engine_manager.diagnostics()
+        if self.measurement_catalog is not None:
+            info.update(self.measurement_catalog.diagnostics())
         labels = {
             "platform": "操作系统",
             "python": "Python",
@@ -59,6 +62,9 @@ class MatlabDiagnosticsDialog(QDialog):
             "runtime_version": "运行时版本",
             "runtime_error": "运行时诊断错误",
             "last_error": "最近错误",
+            "measurement_dataset_root": "实测数据集目录",
+            "measurement_dataset_count": "实测数据集数量",
+            "measurement_datasets": "实测数据集",
         }
         lines = []
         for key, value in info.items():

@@ -15,6 +15,7 @@ class Node:
     name: str
     icon_path: str = ""
     params: dict[str, Any] | None = None
+    model_config: dict[str, Any] | None = None
 
 
 @dataclass
@@ -51,6 +52,7 @@ class TopologyExecutor:
                 name=str(n.get("name", f"Node{node_id}")),
                 icon_path=str(n.get("icon_path", "")),
                 params=n.get("params", {}),
+                model_config=n.get("model_config", {}),
             )
 
         for e in topology.get("edges", []):

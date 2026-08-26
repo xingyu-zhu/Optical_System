@@ -9,7 +9,9 @@ from matlab_component_registry import component_type_for_component
 RESULT_EXCLUDED_TYPES = {"eanalyzer"}
 
 
-def build_component_display_names(nodes: list[dict[str, Any]]) -> dict[int, str]:
+def build_component_display_names(
+    nodes: list[dict[str, Any]], separator: str = " "
+) -> dict[int, str]:
     """Return labels like 'ONURxDSP 1' while preserving stable node ids."""
     sorted_nodes = sorted(nodes, key=lambda item: int(item.get("id", 0)))
     counters: dict[str, int] = {}
@@ -19,7 +21,7 @@ def build_component_display_names(nodes: list[dict[str, Any]]) -> dict[int, str]
         name = str(node.get("name", "Component"))
         component_type = component_type_for_component(name)
         counters[component_type] = counters.get(component_type, 0) + 1
-        labels[node_id] = f"{name} {counters[component_type]}"
+        labels[node_id] = f"{name}{separator}{counters[component_type]}"
     return labels
 
 

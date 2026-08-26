@@ -47,7 +47,23 @@ function [IX, QX, IY, QY] = CoherentReceiver_Module(E_Rx, E_LO, Params)
 %     [IY, QY] = Optical90Hybrid(LO_Y.', Sig_Y.', Rx_Obj);
 
     %% 5. Apply ICR Bandwidth Limitation
-    if isfield(Rx_Obj, 'PD') && isfield(Rx_Obj.PD, 'BandWidth') && ~isempty(Rx_Obj.PD.BandWidth)
+    bandwidthModel = 'IdealBessel';
+    if isfield(Rx_Obj, 'PD') && isfield(Rx_Obj.PD, 'BandwidthModel') && ...
+            ~isempty(Rx_Obj.PD.BandwidthModel)
+        bandwidthModel = char(Rx_Obj.PD.BandwidthModel);
+    end
+    if strcmpi(bandwidthModel, 'Measured')
+        if ~isfield(Rx_Obj.PD, 'BandwidthDatasetPath') || isempty(Rx_Obj.PD.BandwidthDatasetPath)
+            error('OpticalSystem:MeasuredBandwidth:MissingDataset', ...
+                'The receiver measured-bandwidth model has no dataset path.');
+        end
+        Fs = Params.Fs_Tx;
+        datasetPath = Rx_Obj.PD.BandwidthDatasetPath;
+        IX = ApplyMeasuredBandwidthResponse(IX, Fs, datasetPath, 'XI', 'receiver');
+        QX = ApplyMeasuredBandwidthResponse(QX, Fs, datasetPath, 'XQ', 'receiver');
+        IY = ApplyMeasuredBandwidthResponse(IY, Fs, datasetPath, 'YI', 'receiver');
+        QY = ApplyMeasuredBandwidthResponse(QY, Fs, datasetPath, 'YQ', 'receiver');
+    elseif isfield(Rx_Obj, 'PD') && isfield(Rx_Obj.PD, 'BandWidth') && ~isempty(Rx_Obj.PD.BandWidth)
         BW = Rx_Obj.PD.BandWidth;
         Fs = Params.Fs_Tx; % Optical signals are at Fs_Tx before ADC downsampling
         N = length(IX);

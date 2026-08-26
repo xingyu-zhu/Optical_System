@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QGraphicsEllipseItem,
     QGraphicsItem,
     QGraphicsLineItem,
@@ -23,10 +24,12 @@ from PyQt5.QtWidgets import (
     QGraphicsScene,
     QGraphicsSimpleTextItem,
     QGraphicsView,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QShortcut,
     QTableWidget,
@@ -36,6 +39,8 @@ from PyQt5.QtWidgets import (
 )
 
 from component_catalog import resolve_icon_path
+from measured_bandwidth_dialog import MeasurementImportDialog
+from measurement_dataset import LANE_NAMES, MeasurementDatasetCatalog
 from topology_display import build_component_display_names
 
 BOOLEAN_VALUES = {"true", "false"}
@@ -162,15 +167,34 @@ class ComponentMeta:
     name: str
     icon_path: str
     params: dict[str, list[str]] | None = None
+    model_config: dict | None = None
 
 
 class ComponentParameterDialog(QDialog):
-    def __init__(self, component_name: str, params: dict[str, list[str]], parent=None):
+    def __init__(
+        self,
+        component_name: str,
+        params: dict[str, list[str]],
+        model_config: dict | None = None,
+        default_params: dict[str, list[str]] | None = None,
+        measurement_catalog: MeasurementDatasetCatalog | None = None,
+        cache_clear=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(f"编辑参数 - {component_name}")
         self.resize(620, 420)
         self.component_name = component_name
-        self._params = params
+        self._params = {key: list(value) for key, value in params.items()}
+        self._default_params = {
+            key: list(value) for key, value in (default_params or params).items()
+        }
+        self._model_config = dict(model_config or {})
+        self.measurement_catalog = measurement_catalog
+        self.cache_clear = cache_clear or (lambda: None)
+        self._bandwidth_device = self._bandwidth_device_type(component_name)
+        if self._bandwidth_device:
+            self.resize(760, 620)
 
         layout = QVBoxLayout(self)
 
@@ -183,10 +207,159 @@ class ComponentParameterDialog(QDialog):
         self._apply_mode_visibility()
         layout.addWidget(self.table)
 
+        if self._bandwidth_device and self.measurement_catalog is not None:
+            layout.addWidget(self._build_bandwidth_model_group())
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _build_bandwidth_model_group(self) -> QGroupBox:
+        group = QGroupBox("带宽模型", self)
+        form = QFormLayout(group)
+        self.bandwidth_model_combo = QComboBox(group)
+        self.bandwidth_model_combo.addItem("原始 Bessel5", "IdealBessel")
+        self.bandwidth_model_combo.addItem("实测幅频响应", "Measured")
+        current_model = str(self._model_config.get("BandwidthModel", "IdealBessel"))
+        self.bandwidth_model_combo.setCurrentIndex(
+            1 if current_model.lower() == "measured" else 0
+        )
+        self.bandwidth_dataset_combo = QComboBox(group)
+        self.bandwidth_summary_label = QLabel(group)
+        self.bandwidth_summary_label.setWordWrap(True)
+        self._refresh_bandwidth_datasets(
+            str(self._model_config.get("BandwidthDataset", ""))
+        )
+        self.bandwidth_model_combo.currentIndexChanged.connect(
+            self._update_bandwidth_controls
+        )
+        self.bandwidth_dataset_combo.currentIndexChanged.connect(
+            self._update_bandwidth_summary
+        )
+
+        action_widget = QWidget(group)
+        actions = QHBoxLayout(action_widget)
+        actions.setContentsMargins(0, 0, 0, 0)
+        import_button = QPushButton("导入实测数据...", action_widget)
+        original_button = QPushButton("使用原始模型", action_widget)
+        defaults_button = QPushButton("恢复代码默认参数", action_widget)
+        import_button.clicked.connect(self._import_bandwidth_dataset)
+        original_button.clicked.connect(self._select_original_bandwidth_model)
+        defaults_button.clicked.connect(self._restore_code_defaults)
+        actions.addWidget(import_button)
+        actions.addWidget(original_button)
+        actions.addWidget(defaults_button)
+        actions.addStretch(1)
+
+        form.addRow("模型", self.bandwidth_model_combo)
+        form.addRow("实测数据集", self.bandwidth_dataset_combo)
+        form.addRow("数据摘要", self.bandwidth_summary_label)
+        form.addRow(action_widget)
+        self._update_bandwidth_controls()
+        return group
+
+    def _refresh_bandwidth_datasets(self, selected_id: str = "") -> None:
+        self.bandwidth_dataset_combo.clear()
+        self.bandwidth_dataset_combo.addItem("请选择数据集", "")
+        for summary in self.measurement_catalog.list():
+            if summary.device_type != self._bandwidth_device:
+                continue
+            bandwidths = "/".join(
+                "--"
+                if summary.lane_bandwidths_hz[lane] is None
+                else f"{summary.lane_bandwidths_hz[lane] / 1e9:.2f}"
+                for lane in LANE_NAMES
+            )
+            self.bandwidth_dataset_combo.addItem(
+                f"{summary.name}  [{bandwidths} GHz]", summary.dataset_id
+            )
+            if summary.dataset_id == selected_id:
+                self.bandwidth_dataset_combo.setCurrentIndex(
+                    self.bandwidth_dataset_combo.count() - 1
+                )
+
+    def _update_bandwidth_controls(self, *_args) -> None:
+        measured = self.bandwidth_model_combo.currentData() == "Measured"
+        self.bandwidth_dataset_combo.setEnabled(measured)
+        self._update_bandwidth_summary()
+
+    def _update_bandwidth_summary(self, *_args) -> None:
+        if self.bandwidth_model_combo.currentData() != "Measured":
+            default_bw = "35 GHz" if self._bandwidth_device == "modulator" else "25 GHz"
+            self.bandwidth_summary_label.setText(f"使用代码原始 Bessel5，默认带宽 {default_bw}。")
+            return
+        dataset_id = str(self.bandwidth_dataset_combo.currentData() or "")
+        if not dataset_id:
+            self.bandwidth_summary_label.setText("请选择或导入四通道实测数据集。")
+            return
+        try:
+            dataset = self.measurement_catalog.get(dataset_id)
+            details = []
+            for lane in LANE_NAMES:
+                response = dataset["lanes"][lane]
+                bandwidth = response.get("bandwidth_3db_hz")
+                bandwidth_text = "--" if bandwidth is None else f"{bandwidth / 1e9:.3f} GHz"
+                details.append(f"{lane} {bandwidth_text}")
+            self.bandwidth_summary_label.setText("；".join(details))
+        except Exception as exc:
+            self.bandwidth_summary_label.setText(f"数据集不可用: {exc}")
+
+    def _import_bandwidth_dataset(self) -> None:
+        dialog = MeasurementImportDialog(
+            self.measurement_catalog,
+            device_type=self._bandwidth_device,
+            parent=self,
+        )
+        if dialog.exec_():
+            dataset_id = str((dialog.prepared_dataset or {}).get("id", ""))
+            self._refresh_bandwidth_datasets(dataset_id)
+            self.bandwidth_model_combo.setCurrentIndex(1)
+            self.cache_clear()
+
+    def _select_original_bandwidth_model(self) -> None:
+        self.bandwidth_model_combo.setCurrentIndex(0)
+
+    def _restore_code_defaults(self) -> None:
+        self._params = {
+            key: list(value) for key, value in self._default_params.items()
+        }
+        self.table.setRowCount(0)
+        self._load_params()
+        self._apply_mode_visibility()
+        self.bandwidth_model_combo.setCurrentIndex(0)
+        self.bandwidth_dataset_combo.setCurrentIndex(0)
+
+    def get_model_config(self) -> dict:
+        if not self._bandwidth_device or self.measurement_catalog is None:
+            return dict(self._model_config)
+        model = str(self.bandwidth_model_combo.currentData())
+        dataset_id = (
+            str(self.bandwidth_dataset_combo.currentData() or "")
+            if model == "Measured"
+            else ""
+        )
+        return {"BandwidthModel": model, "BandwidthDataset": dataset_id}
+
+    def accept(self) -> None:
+        if (
+            self._bandwidth_device
+            and self.measurement_catalog is not None
+            and self.bandwidth_model_combo.currentData() == "Measured"
+            and not self.bandwidth_dataset_combo.currentData()
+        ):
+            QMessageBox.warning(self, "带宽模型", "请选择或导入实测数据集。")
+            return
+        super().accept()
+
+    @staticmethod
+    def _bandwidth_device_type(component_name: str) -> str:
+        normalized = "".join(ch.lower() for ch in component_name if ch.isalnum())
+        if "modulator" in normalized:
+            return "modulator"
+        if normalized in {"icr", "coherentreceiver"}:
+            return "receiver"
+        return ""
 
     def _load_params(self) -> None:
         items = list(self._params.items())
@@ -558,6 +731,7 @@ class NodeItem(QGraphicsRectItem):
             "x": pos.x(),
             "y": pos.y(),
             "params": self.meta.params or {},
+            "model_config": dict(self.meta.model_config or {}),
         }
 
 
@@ -743,7 +917,12 @@ class TopologyScene(QGraphicsScene):
         self._sync_next_id()
         node = NodeItem(
             self._next_id,
-            ComponentMeta(name=name, icon_path=resolved_icon, params=default_params),
+            ComponentMeta(
+                name=name,
+                icon_path=resolved_icon,
+                params=default_params,
+                model_config=self._default_model_config(name),
+            ),
         )
         self._next_id += 1
         node.setPos(pos)
@@ -775,6 +954,23 @@ class TopologyScene(QGraphicsScene):
     @staticmethod
     def _copy_params(params: dict[str, list[str]]) -> dict[str, list[str]]:
         return {k: list(v) for k, v in params.items()}
+
+    @staticmethod
+    def _default_model_config(name: str) -> dict:
+        normalized = "".join(ch.lower() for ch in name if ch.isalnum())
+        if "modulator" in normalized or normalized in {"icr", "coherentreceiver"}:
+            return {"BandwidthModel": "IdealBessel", "BandwidthDataset": ""}
+        return {}
+
+    @staticmethod
+    def _merge_model_config(name: str, model_config: dict | None) -> dict:
+        merged = TopologyScene._default_model_config(name)
+        if merged:
+            model = str((model_config or {}).get("BandwidthModel", "IdealBessel"))
+            dataset_id = str((model_config or {}).get("BandwidthDataset", ""))
+            merged["BandwidthModel"] = "Measured" if model.lower() == "measured" else "IdealBessel"
+            merged["BandwidthDataset"] = dataset_id if merged["BandwidthModel"] == "Measured" else ""
+        return merged
 
     @staticmethod
     def _merge_with_default_params(
@@ -896,8 +1092,15 @@ class TopologyScene(QGraphicsScene):
             name = node_data.get("name", f"Node{node_id}")
             icon_path = resolve_icon_path(name, node_data.get("icon_path", ""))
             params = self._merge_with_default_params(name, node_data.get("params"))
+            model_config = self._merge_model_config(name, node_data.get("model_config"))
             node = NodeItem(
-                node_id, ComponentMeta(name=name, icon_path=icon_path, params=params)
+                node_id,
+                ComponentMeta(
+                    name=name,
+                    icon_path=icon_path,
+                    params=params,
+                    model_config=model_config,
+                ),
             )
 
             if has_xy:
@@ -1018,10 +1221,7 @@ class WorkspaceView(QGraphicsView):
             super().dragEnterEvent(event)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
-        if event.key() == Qt.Key_Delete or (
-            event.key() == Qt.Key_Backspace
-            and event.modifiers() & (Qt.ControlModifier | Qt.MetaModifier)
-        ):
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             self.delete_requested.emit()
             event.accept()
             return
@@ -1065,10 +1265,17 @@ class WorkspacePanel(QWidget):
     node_parameter_updated = pyqtSignal(int, dict)
     analyzer_open_requested = pyqtSignal(int, str)
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        measurement_catalog: MeasurementDatasetCatalog | None = None,
+        measurement_cache_clear=None,
+    ):
         super().__init__(parent)
         self._clipboard_nodes: list[dict] = []
         self._clipboard_edges: list[dict] = []
+        self.measurement_catalog = measurement_catalog or MeasurementDatasetCatalog()
+        self.measurement_cache_clear = measurement_cache_clear or (lambda: None)
         self._setup_ui()
         self._setup_shortcuts()
 
@@ -1133,9 +1340,25 @@ class WorkspacePanel(QWidget):
             return
 
         params = self.scene._merge_with_default_params(node.meta.name, node.meta.params)
-        dialog = ComponentParameterDialog(node.meta.name, params, parent=self)
+        previous_model_config = dict(node.meta.model_config or {})
+        dialog = ComponentParameterDialog(
+            node.meta.name,
+            params,
+            model_config=self.scene._merge_model_config(
+                node.meta.name, node.meta.model_config
+            ),
+            default_params=self.scene._default_params(node.meta.name),
+            measurement_catalog=self.measurement_catalog,
+            cache_clear=self.measurement_cache_clear,
+            parent=self,
+        )
         if dialog.exec_() == QDialog.Accepted:
             node.meta.params = dialog.get_params()
+            node.meta.model_config = self.scene._merge_model_config(
+                node.meta.name, dialog.get_model_config()
+            )
+            if node.meta.model_config != previous_model_config:
+                self.measurement_cache_clear()
             self.node_parameter_updated.emit(node.node_id, node.meta.params)
             self.design_changed.emit()
 
@@ -1172,6 +1395,7 @@ class WorkspacePanel(QWidget):
                     "name": node.meta.name,
                     "icon_path": node.meta.icon_path,
                     "params": node.meta.params or {},
+                    "model_config": dict(node.meta.model_config or {}),
                     "dx": p.x() - base.x(),
                     "dy": p.y() - base.y(),
                 }
@@ -1209,6 +1433,9 @@ class WorkspacePanel(QWidget):
             )
             node.meta.params = self.scene._merge_with_default_params(
                 node.meta.name, node_data.get("params", {})
+            )
+            node.meta.model_config = self.scene._merge_model_config(
+                node.meta.name, node_data.get("model_config", {})
             )
             node.setSelected(True)
             if "id" in node_data:
@@ -1272,3 +1499,71 @@ class WorkspacePanel(QWidget):
         self.scene._emit_counts()
         self.design_changed.emit()
         return node.node_id
+
+    def bandwidth_model_nodes(self) -> list[NodeItem]:
+        nodes = [
+            item
+            for item in self.scene.items()
+            if isinstance(item, NodeItem) and self.bandwidth_device_type(item)
+        ]
+        return sorted(nodes, key=lambda node: node.node_id)
+
+    @staticmethod
+    def bandwidth_device_type(node: NodeItem) -> str:
+        normalized = "".join(ch.lower() for ch in node.meta.name if ch.isalnum())
+        if "modulator" in normalized:
+            return "modulator"
+        if normalized in {"icr", "coherentreceiver"}:
+            return "receiver"
+        return ""
+
+    def _node_by_id(self, node_id: int) -> NodeItem | None:
+        return next(
+            (
+                item
+                for item in self.scene.items()
+                if isinstance(item, NodeItem) and item.node_id == int(node_id)
+            ),
+            None,
+        )
+
+    def set_node_bandwidth_dataset(self, node_id: int, dataset_id: str) -> None:
+        node = self._node_by_id(node_id)
+        if node is None or not self.bandwidth_device_type(node):
+            raise ValueError("目标组件不支持实测带宽模型。")
+        node.meta.model_config = {
+            "BandwidthModel": "Measured",
+            "BandwidthDataset": str(dataset_id),
+        }
+        self.design_changed.emit()
+
+    def use_original_bandwidth_model(self, node_id: int) -> None:
+        node = self._node_by_id(node_id)
+        if node is None:
+            return
+        node.meta.model_config = self.scene._default_model_config(node.meta.name)
+        self.design_changed.emit()
+
+    def restore_node_defaults(self, node_id: int) -> None:
+        node = self._node_by_id(node_id)
+        if node is None:
+            return
+        node.meta.params = self.scene._default_params(node.meta.name)
+        node.meta.model_config = self.scene._default_model_config(node.meta.name)
+        self.node_parameter_updated.emit(node.node_id, node.meta.params)
+        self.design_changed.emit()
+
+    def restore_all_defaults(self) -> None:
+        for item in self.scene.items():
+            if isinstance(item, NodeItem):
+                item.meta.params = self.scene._default_params(item.meta.name)
+                item.meta.model_config = self.scene._default_model_config(item.meta.name)
+        self.scene.global_params = {}
+        self.scene.sweep_config = []
+        self.design_changed.emit()
+
+    def dataset_in_use(self, dataset_id: str) -> bool:
+        return any(
+            str((node.meta.model_config or {}).get("BandwidthDataset", "")) == str(dataset_id)
+            for node in self.bandwidth_model_nodes()
+        )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import time
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -35,11 +34,9 @@ class MatlabStartupWorker(QThread):
     def run(self) -> None:
         try:
             self.progress_changed.emit(12, "正在初始化启动流程")
-            time.sleep(0.12)
             root = self.manager.preferred_matlab_root
             detected = f"检测到 {root.name}" if root else "未检测到默认 MATLAB 安装"
             self.progress_changed.emit(38, detected)
-            time.sleep(0.12)
             self.progress_changed.emit(72, "正在启动 MATLAB 引擎")
             self.manager.start()
             self.progress_changed.emit(100, "MATLAB 引擎已就绪")
@@ -53,31 +50,79 @@ class StartupWindow(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("startupWindow")
         self.setWindowTitle("系统初始化")
-        self.setFixedSize(720, 270)
+        self.setFixedSize(720, 280)
         self.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
 
         self.title_label = QLabel("多维复用超高速光接入端到端系统仿真平台", self)
+        self.title_label.setObjectName("startupTitle")
         self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet(
-            "font-size: 26px; font-weight: 700; color: #1f2f40;"
-        )
 
         self.dev_label = QLabel("香港理工大学深圳研究院光子研究中心", self)
+        self.dev_label.setObjectName("startupDeveloper")
         self.dev_label.setAlignment(Qt.AlignCenter)
-        self.dev_label.setStyleSheet("font-size: 15px; color: #34495e;")
 
         self.version_label = QLabel("版本号：3.10", self)
+        self.version_label.setObjectName("startupVersion")
         self.version_label.setAlignment(Qt.AlignCenter)
-        self.version_label.setStyleSheet("font-size: 13px; color: #506274;")
 
         self.status_label = QLabel("正在初始化...", self)
+        self.status_label.setObjectName("startupStatus")
         self.status_label.setAlignment(Qt.AlignCenter)
 
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setObjectName("startupProgress")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(12)
+
+        self.setStyleSheet(
+            """
+            QWidget#startupWindow {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #f4f9ff, stop: 1 #dbeaf7
+                );
+            }
+            QLabel#startupTitle {
+                color: #123b63;
+                font-size: 26px;
+                font-weight: 700;
+            }
+            QLabel#startupDeveloper {
+                color: #365d7d;
+                font-size: 15px;
+            }
+            QLabel#startupVersion {
+                color: #5f7890;
+                font-size: 13px;
+            }
+            QLabel#startupStatus {
+                color: #1f5f8f;
+                background: rgba(248, 252, 255, 210);
+                border: 1px solid #b9d3ea;
+                border-radius: 6px;
+                padding: 7px;
+            }
+            QProgressBar#startupProgress {
+                background: #e8f1f8;
+                border: 1px solid #8eb9dc;
+                border-radius: 5px;
+            }
+            QProgressBar#startupProgress::chunk {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #2f80c2, stop: 1 #65b6e8
+                );
+                border-radius: 4px;
+            }
+            """
+        )
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(44, 30, 44, 30)
+        layout.setSpacing(8)
         layout.addStretch(1)
         layout.addWidget(self.title_label)
         layout.addWidget(self.dev_label)
@@ -89,7 +134,6 @@ class StartupWindow(QWidget):
 
     def update_progress(self, value: int, text: str) -> None:
         self.status_label.setText(text)
-        self.progress_bar.setValue(value)
 
 
 def _move_window_to_startup_screen(startup: QWidget, window: QWidget) -> None:

@@ -150,6 +150,7 @@ def write_reproducibility_record(
     topology: dict[str, Any],
     outputs: dict[str, Any],
     engine_diagnostics: dict[str, Any],
+    measurement_datasets: list[dict[str, Any]] | None = None,
 ) -> Path:
     return atomic_write_json(path, {
         "format": "OpticalSystemSimulationRecord/1",
@@ -162,6 +163,7 @@ def write_reproducibility_record(
             "matlab": engine_diagnostics,
         },
         "topology": topology,
+        "measurement_datasets": measurement_datasets or [],
         "outputs": outputs,
     })
 
