@@ -36,7 +36,9 @@ class MatlabStartupWorker(QThread):
         try:
             self.progress_changed.emit(12, "正在初始化启动流程")
             time.sleep(0.12)
-            self.progress_changed.emit(38, "正在检测现有 MATLAB 会话")
+            root = self.manager.preferred_matlab_root
+            detected = f"检测到 {root.name}" if root else "未检测到默认 MATLAB 安装"
+            self.progress_changed.emit(38, detected)
             time.sleep(0.12)
             self.progress_changed.emit(72, "正在启动 MATLAB 引擎")
             self.manager.start()
@@ -73,7 +75,7 @@ class StartupWindow(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
 
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setRange(0, 100)
 
         layout = QVBoxLayout(self)
         layout.addStretch(1)
@@ -87,6 +89,7 @@ class StartupWindow(QWidget):
 
     def update_progress(self, value: int, text: str) -> None:
         self.status_label.setText(text)
+        self.progress_bar.setValue(value)
 
 
 def _move_window_to_startup_screen(startup: QWidget, window: QWidget) -> None:
@@ -134,7 +137,7 @@ def main() -> int:
             reply = QMessageBox.question(
                 startup,
                 "选择 MATLAB 路径",
-                "自动启动 MATLAB 引擎失败。\n\n是否手动选择 MATLAB 安装目录或 MATLAB Engine Python 目录后重试？",
+                "自动启动 MATLAB 引擎失败。\n\n选择“是”可手动指定 MATLAB；选择“否”进入离线模式。",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes,
             )
@@ -155,8 +158,11 @@ def main() -> int:
                         QMessageBox.warning(startup, "MATLAB 路径无效", str(exc))
 
         startup.close()
+        manager = worker.manager if worker is not None else MatlabEngineManager()
         window = MainWindow(
-            engine_manager=MatlabEngineManager(), initial_engine_status="Error"
+            engine_manager=manager,
+            initial_engine_status="Offline",
+            offline_mode=True,
         )
         window.output_widget.append_message(
             f"Startup error: {error_text}", source="ERROR"

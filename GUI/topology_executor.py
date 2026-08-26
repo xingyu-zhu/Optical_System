@@ -119,6 +119,8 @@ class TopologyExecutor:
         self,
         component_runner,
         initial_inputs: dict[int, dict[str, Any]] | None = None,
+        cached_outputs: dict[int, dict[str, Any]] | None = None,
+        skip_nodes: set[int] | None = None,
     ) -> dict[int, dict[str, Any]]:
         """Execute nodes in topological order using a user-supplied runner.
 
@@ -138,6 +140,8 @@ class TopologyExecutor:
                 routed_inputs[nid].update(port_map)
 
         outputs_by_node: dict[int, dict[str, Any]] = {}
+        cached_outputs = cached_outputs or {}
+        skip_nodes = skip_nodes or set()
 
         for level in levels:
             for node_id in level:
@@ -154,7 +158,12 @@ class TopologyExecutor:
                     for e in incoming_edges.get(node_id, [])
                 ]
 
-                outputs = component_runner(node, node_inputs) or {}
+                if node_id in skip_nodes:
+                    if node_id not in cached_outputs:
+                        raise KeyError(f"Missing cached output for node {node_id}")
+                    outputs = cached_outputs[node_id]
+                else:
+                    outputs = component_runner(node, node_inputs) or {}
                 if not isinstance(outputs, dict):
                     raise TypeError(
                         f"Runner must return dict, got {type(outputs)} for node {node_id}"

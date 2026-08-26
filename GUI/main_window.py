@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 import threading
+from datetime import datetime
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -26,11 +27,15 @@ from PyQt5.QtWidgets import (
 )
 
 from component_panel import ComponentPanel
+from external_matlab_wizard import ExternalMatlabWizard
+from matlab_diagnostics_dialog import MatlabDiagnosticsDialog
 from matlab_engine_manager import MatlabEngineManager
 from matlab_topology_runner import MatlabTopologyRunner, SimulationCancelled
 from output_widget import OutputWidget
 from parameter_sweep_dialog import ParameterSweepDialog
 from signal_plotter import _as_array
+from simulation_artifacts import topology_signature, write_reproducibility_record
+from simulation_preflight import run_preflight
 from simulation_result_viewer import AnalyzerPlotDialog, SimulationResultDialog
 from topology_display import (
     build_component_display_names,
@@ -51,15 +56,29 @@ class MatlabTopologyWorker(QThread):
     failed = pyqtSignal(str)
 
     def __init__(
-        self, engine_manager: MatlabEngineManager, topology: dict, parent=None
+        self,
+        engine_manager: MatlabEngineManager,
+        topology: dict,
+        checkpoint_path: Path | None = None,
+        parent=None,
     ):
         super().__init__(parent)
         self.engine_manager = engine_manager
         self.topology = topology
         self.cancel_event = threading.Event()
+        self.pause_event = threading.Event()
+        self.pause_event.set()
+        self.checkpoint_path = checkpoint_path
 
     def request_stop(self) -> None:
         self.cancel_event.set()
+        self.pause_event.set()
+
+    def request_pause(self) -> None:
+        self.pause_event.clear()
+
+    def request_resume(self) -> None:
+        self.pause_event.set()
 
     def run(self) -> None:
         try:
@@ -69,6 +88,8 @@ class MatlabTopologyWorker(QThread):
                     message, source
                 ),
                 cancel_event=self.cancel_event,
+                pause_event=self.pause_event,
+                checkpoint_path=self.checkpoint_path,
             )
             outputs = runner.run(self.topology)
             self.finished_ok.emit(outputs)
@@ -90,16 +111,9 @@ class MatlabShutdownWorker(QThread):
     def run(self) -> None:
         try:
             if self.engine_manager.is_running():
-                eng = self.engine_manager.engine
-                if eng is not None:
+                if not self.engine_manager.is_busy():
                     self.progress.emit("正在清理 MATLAB 工作区...")
-                    try:
-                        eng.eval(
-                            "try, close all hidden; clearvars; if usejava('jvm'), java.lang.System.gc(); end; drawnow; catch, end",
-                            nargout=0,
-                        )
-                    except Exception:
-                        pass
+                    self.engine_manager.cleanup_workspace()
                 self.progress.emit("正在断开 MATLAB 引擎...")
                 self.engine_manager.stop()
             self.finished_ok.emit()
@@ -114,16 +128,20 @@ class MainWindow(QMainWindow):
         self,
         engine_manager: MatlabEngineManager,
         initial_engine_status: str = "Unknown",
+        offline_mode: bool = False,
         parent=None,
     ):
         super().__init__(parent)
         self.engine_manager = engine_manager
+        self.offline_mode = bool(offline_mode)
         self._simulation_worker = None
         self._shutdown_worker = None
         self._shutdown_dialog = None
         self._shutdown_in_progress = False
         self._allow_close_after_shutdown = False
         self.stop_simulation_actions = []
+        self.pause_simulation_actions = []
+        self.resume_simulation_actions = []
         self._latest_topology = None
         self._latest_outputs = {}
         self._analysis_windows = []
@@ -141,6 +159,7 @@ class MainWindow(QMainWindow):
         self._create_status_area(initial_engine_status)
         self._connect_signals()
         self._set_simulation_running(False)
+        self.output_widget.set_offline_mode(self.offline_mode)
         self._mark_design_clean()
 
     def _setup_central(self, engine_manager: MatlabEngineManager) -> None:
@@ -246,6 +265,29 @@ class MainWindow(QMainWindow):
         )
         self.stop_simulation_actions.append(self.stop_simulation_action)
         sim_menu.addAction(self.stop_simulation_action)
+        self.pause_simulation_action = self._make_action(
+            "暂停仿真", "Ctrl+F6", self._pause_topology_simulation
+        )
+        self.resume_simulation_action = self._make_action(
+            "恢复仿真", "F6", self._resume_topology_simulation
+        )
+        self.pause_simulation_actions.append(self.pause_simulation_action)
+        self.resume_simulation_actions.append(self.resume_simulation_action)
+        sim_menu.addAction(self.pause_simulation_action)
+        sim_menu.addAction(self.resume_simulation_action)
+
+        tools_menu = menu.addMenu("工具")
+        tools_menu.addAction(self._make_action("仿真预检查", None, self._show_preflight))
+        tools_menu.addAction(self._make_action("MATLAB 诊断", None, self._show_matlab_diagnostics))
+        tools_menu.addAction(
+            self._make_action(
+                "外部 MATLAB 组件向导", None, self._show_external_matlab_wizard
+            )
+        )
+        self.offline_action = self._make_action("离线模式", None, self._toggle_offline_mode)
+        self.offline_action.setCheckable(True)
+        self.offline_action.setChecked(self.offline_mode)
+        tools_menu.addAction(self.offline_action)
 
     def _create_tool_bars(self) -> None:
         file_tb = QToolBar("文件", self)
@@ -628,10 +670,23 @@ class MainWindow(QMainWindow):
             return
 
         topology = self.workspace_panel.scene.serialize()
+        report = run_preflight(topology, offline=self.offline_mode)
+        if not report.ok:
+            QMessageBox.warning(self, "仿真预检查", report.to_text())
+            self.output_widget.append_message("仿真预检查未通过。", source="ERROR")
+            return
+        if self.offline_mode:
+            QMessageBox.information(self, "离线模式", report.to_text())
+            return
         self._latest_topology = topology
         self.status_label.setText("正在运行设计仿真")
 
-        worker = MatlabTopologyWorker(self.engine_manager, topology, self)
+        worker = MatlabTopologyWorker(
+            self.engine_manager,
+            topology,
+            checkpoint_path=self._sweep_checkpoint_path(topology),
+            parent=self,
+        )
         self._simulation_worker = worker
         worker.log_message.connect(
             lambda message, source: self.output_widget.append_message(
@@ -653,11 +708,67 @@ class MainWindow(QMainWindow):
             )
             return
         worker.request_stop()
-        self._set_simulation_running(False)
         self.status_label.setText("正在停止设计仿真")
         self.output_widget.append_message(
             "已请求停止仿真，正在等待当前 MATLAB 调用结束或取消。", source="INFO"
         )
+
+    def _pause_topology_simulation(self) -> None:
+        worker = self._simulation_worker
+        if worker is None or not worker.isRunning():
+            return
+        worker.request_pause()
+        self.pause_simulation_action.setEnabled(False)
+        self.resume_simulation_action.setEnabled(True)
+        self.status_label.setText("仿真将在当前 MATLAB 调用结束后暂停")
+        self.output_widget.append_message("已请求暂停仿真。", source="INFO")
+
+    def _resume_topology_simulation(self) -> None:
+        worker = self._simulation_worker
+        if worker is None or not worker.isRunning():
+            return
+        worker.request_resume()
+        self.pause_simulation_action.setEnabled(True)
+        self.resume_simulation_action.setEnabled(False)
+        self.status_label.setText("正在运行设计仿真")
+        self.output_widget.append_message("仿真已恢复。", source="INFO")
+
+    def _sweep_checkpoint_path(self, topology: dict) -> Path | None:
+        if not any(item.get("enabled", True) for item in topology.get("parameter_sweeps", [])):
+            return None
+        if self._topology_file_path is not None and not self._topology_path_is_temporary:
+            return self._topology_file_path.with_suffix(".sweep-checkpoint.json")
+        root = Path(tempfile.gettempdir()) / "OpticalSystemGUI" / "sweep_checkpoints"
+        return root / f"{topology_signature(topology)}.json"
+
+    def _show_preflight(self) -> None:
+        report = run_preflight(
+            self.workspace_panel.scene.serialize(), offline=self.offline_mode
+        )
+        if report.ok:
+            QMessageBox.information(self, "仿真预检查", report.to_text())
+        else:
+            QMessageBox.warning(self, "仿真预检查", report.to_text())
+
+    def _show_matlab_diagnostics(self) -> None:
+        MatlabDiagnosticsDialog(self.engine_manager, self).exec_()
+
+    def _show_external_matlab_wizard(self) -> None:
+        dialog = ExternalMatlabWizard(self)
+        if dialog.exec_():
+            node_id = self.workspace_panel.add_external_matlab_component(dialog.parameters())
+            self.status_label.setText(f"已添加外部 MATLAB 组件: {node_id}")
+
+    def _toggle_offline_mode(self, checked: bool) -> None:
+        if checked and self._simulation_worker is not None and self._simulation_worker.isRunning():
+            self.offline_action.setChecked(False)
+            QMessageBox.information(self, "离线模式", "请先停止当前仿真。")
+            return
+        self.offline_mode = bool(checked)
+        self.output_widget.set_offline_mode(self.offline_mode)
+        connected_status = "Ready" if self.engine_manager.is_running() else "Disconnected"
+        self.update_engine_status("Offline" if checked else connected_status)
+        self.status_label.setText("离线模式" if checked else "就绪")
 
     def _configure_parameter_sweep(self) -> None:
         topology = self.workspace_panel.scene.serialize()
@@ -686,6 +797,28 @@ class MainWindow(QMainWindow):
         self.output_widget.append_message(
             "设计仿真完成。双击光/电分析仪组件可查看对应结果。", source="INFO"
         )
+        self._write_simulation_record()
+
+    def _write_simulation_record(self) -> None:
+        topology = self._latest_topology or self.workspace_panel.scene.serialize()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if self._topology_file_path is not None and not self._topology_path_is_temporary:
+            folder = self._topology_file_path.parent / "simulation_records"
+            stem = self._topology_file_path.stem
+        else:
+            folder = PROJECT_DIR / "simulation_records"
+            stem = "unsaved_design"
+        path = folder / f"{stem}_{timestamp}.json"
+        try:
+            write_reproducibility_record(
+                path,
+                topology,
+                self._latest_outputs,
+                self.engine_manager.diagnostics(),
+            )
+            self.output_widget.append_message(f"仿真可复现记录: {path}", source="INFO")
+        except Exception as exc:
+            self.output_widget.append_message(f"写入仿真记录失败: {exc}", source="ERROR")
 
     def _on_topology_simulation_cancelled(self, message: str) -> None:
         self._simulation_worker = None
@@ -950,7 +1083,23 @@ class MainWindow(QMainWindow):
     def _set_simulation_running(self, running: bool) -> None:
         for action in getattr(self, "stop_simulation_actions", []):
             action.setEnabled(running)
+        for action in getattr(self, "pause_simulation_actions", []):
+            action.setEnabled(running)
+        for action in getattr(self, "resume_simulation_actions", []):
+            action.setEnabled(False)
+        if hasattr(self, "output_widget"):
+            self.output_widget.set_engine_controls_locked(running)
+        if hasattr(self, "offline_action"):
+            self.offline_action.setEnabled(not running)
 
     def update_engine_status(self, status: str) -> None:
+        if status == "Ready":
+            self.offline_mode = False
+            if hasattr(self, "output_widget"):
+                self.output_widget.set_offline_mode(False)
+            if hasattr(self, "offline_action"):
+                self.offline_action.blockSignals(True)
+                self.offline_action.setChecked(False)
+                self.offline_action.blockSignals(False)
         if hasattr(self, "engine_status_label"):
             self.engine_status_label.setText(f"MATLAB Engine Status: {status}")

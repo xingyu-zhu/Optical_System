@@ -1260,3 +1260,15 @@ class WorkspacePanel(QWidget):
     def set_sweep_config(self, config: list[dict]) -> None:
         self.scene.sweep_config = list(config or [])
         self.design_changed.emit()
+
+    def add_external_matlab_component(self, params: dict[str, list[str]]) -> int:
+        """Create a configured MatlabFile node at the current viewport center."""
+        center = self.view.mapToScene(self.view.viewport().rect().center())
+        node = self.scene.create_node(
+            "MatlabFile", resolve_icon_path("MatlabFile"), center
+        )
+        node.meta.params = self.scene._merge_with_default_params("MatlabFile", params)
+        node.setSelected(True)
+        self.scene._emit_counts()
+        self.design_changed.emit()
+        return node.node_id

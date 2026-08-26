@@ -21,7 +21,6 @@ pyinstaller `
   --hidden-import pyexpat `
   --hidden-import xml.parsers.expat `
   --hidden-import matlab.engine `
-  --hidden-import matlabengineforpython3_10 `
   --hidden-import matplotlib.backends.backend_qt5agg `
   --add-data "..\Component;Component" `
   --add-data "icon;icon" `

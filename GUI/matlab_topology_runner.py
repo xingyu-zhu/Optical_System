@@ -6,10 +6,13 @@ import copy
 import gc
 import itertools
 import math
+import os
+import platform
 import re
 import subprocess
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
@@ -19,6 +22,7 @@ from matlab_component_registry import (
     matlab_function_for_component,
 )
 from matlab_engine_manager import MatlabEngineManager
+from simulation_artifacts import SweepCheckpoint, topology_signature
 from topology_display import (
     build_component_display_names,
     build_node_display_indices,
@@ -41,10 +45,14 @@ class MatlabTopologyRunner:
         engine_manager: MatlabEngineManager,
         log: LogCallback | None = None,
         cancel_event: threading.Event | None = None,
+        pause_event: threading.Event | None = None,
+        checkpoint_path: str | Path | None = None,
     ):
         self.engine_manager = engine_manager
         self.log = log or (lambda _message, _source="INFO": None)
         self.cancel_event = cancel_event
+        self.pause_event = pause_event
+        self.checkpoint_path = Path(checkpoint_path) if checkpoint_path else None
 
     def run(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
         self._raise_if_cancelled()
@@ -53,7 +61,25 @@ class MatlabTopologyRunner:
             return self._run_parameter_sweep(topology, sweep)
         return self._run_once(topology)
 
-    def _run_once(self, topology: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    def _run_once(
+        self,
+        topology: dict[str, Any],
+        eng=None,
+        cached_outputs: dict[int, dict[str, Any]] | None = None,
+        skip_nodes: set[int] | None = None,
+        retain_cache: bool = False,
+        manage_cache: bool = True,
+    ) -> dict[int, dict[str, Any]]:
+        if eng is None:
+            with self.engine_manager.session() as leased_engine:
+                return self._run_once(
+                    topology,
+                    eng=leased_engine,
+                    cached_outputs=cached_outputs,
+                    skip_nodes=skip_nodes,
+                    retain_cache=retain_cache,
+                    manage_cache=manage_cache,
+                )
         executor = TopologyExecutor(topology)
         global_params = self._to_matlab_params(topology.get("global_params") or {})
         node_contexts = self._build_node_contexts(executor)
@@ -62,13 +88,14 @@ class MatlabTopologyRunner:
             node_id: len(outgoing_edges.get(node_id, [])) for node_id in executor.nodes
         }
 
-        eng = self.engine_manager.start()
-        self._clear_matlab_workspace_cache(eng)
+        if manage_cache:
+            self._clear_matlab_workspace_cache(eng)
 
         def component_runner(
             node: Node, inputs_by_port: dict[str, Any]
         ) -> dict[str, Any]:
             self._raise_if_cancelled()
+            self._wait_if_paused()
             function_name = matlab_function_for_component(node.name)
             node_context = node_contexts[node.node_id]
 
@@ -90,19 +117,19 @@ class MatlabTopologyRunner:
             self._close_hidden_matlab_figures(eng)
             result = dict(outputs)
             self._log_workspace_status(node, result)
-            for edge in incoming_edges.get(node.node_id, []):
-                remaining_cache_consumers[edge.source_id] = max(
-                    0,
-                    remaining_cache_consumers.get(edge.source_id, 0) - 1,
-                )
-                if remaining_cache_consumers[edge.source_id] == 0:
-                    source_node = executor.nodes.get(edge.source_id)
-                    if source_node is not None:
-                        self._delete_matlab_workspace_cache_ref(
-                            eng, source_node.node_id, source_node.name
-                        )
-            if remaining_cache_consumers.get(node.node_id, 0) == 0:
-                self._delete_matlab_workspace_cache_ref(eng, node.node_id, node.name)
+            if not retain_cache:
+                for edge in incoming_edges.get(node.node_id, []):
+                    remaining_cache_consumers[edge.source_id] = max(
+                        0, remaining_cache_consumers.get(edge.source_id, 0) - 1
+                    )
+                    if remaining_cache_consumers[edge.source_id] == 0:
+                        source_node = executor.nodes.get(edge.source_id)
+                        if source_node is not None:
+                            self._delete_matlab_workspace_cache_ref(
+                                eng, source_node.node_id, source_node.name
+                            )
+                if remaining_cache_consumers.get(node.node_id, 0) == 0:
+                    self._delete_matlab_workspace_cache_ref(eng, node.node_id, node.name)
             return {
                 "default": result,
                 "right": result,
@@ -111,11 +138,16 @@ class MatlabTopologyRunner:
             }
 
         try:
-            outputs = executor.run(component_runner)
+            outputs = executor.run(
+                component_runner,
+                cached_outputs=cached_outputs,
+                skip_nodes=skip_nodes,
+            )
             self._log_final_metrics(outputs, topology)
             return outputs
         finally:
-            self._cleanup_matlab_after_run(eng)
+            if manage_cache:
+                self._cleanup_matlab_after_run(eng)
 
     def _run_parameter_sweep(
         self, topology: dict[str, Any], sweep: dict[str, Any]
@@ -123,18 +155,55 @@ class MatlabTopologyRunner:
         points = list(self._iter_sweep_points(sweep["depth_groups"]))
         rows: list[dict[str, Any]] = []
         last_outputs: dict[int, dict[str, Any]] = {}
-
         total = len(points)
+        checkpoint = None
+        completed_points = 0
+        if self.checkpoint_path is not None:
+            checkpoint = SweepCheckpoint(self.checkpoint_path, topology_signature(topology))
+            try:
+                rows, completed_points = checkpoint.load_state()
+                if completed_points:
+                    self.log(f"从扫描断点恢复，已完成 {completed_points}/{total} 个点", "INFO")
+            except ValueError as exc:
+                self.log(str(exc) + " 将重新开始扫描。", "INFO")
+                rows = []
+                completed_points = 0
 
-        for index, point in enumerate(points, start=1):
-            self._raise_if_cancelled()
-            point_topology = self._topology_with_sweep_values(
-                topology, point["assignments"]
-            )
-            self.log(f"参数扫描 {index}/{total}", "INFO")
-            outputs = self._run_once(point_topology)
-            last_outputs = outputs
-            rows.extend(self._collect_sweep_rows(outputs, point_topology, point, index))
+        static_nodes = self._static_sweep_nodes(topology, sweep)
+        cached_outputs: dict[int, dict[str, Any]] | None = None
+        with self.engine_manager.session() as eng:
+            self._clear_matlab_workspace_cache(eng)
+            try:
+                for index, point in enumerate(points, start=1):
+                    if index <= completed_points:
+                        continue
+                    self._raise_if_cancelled()
+                    self._wait_if_paused()
+                    point_topology = self._topology_with_sweep_values(
+                        topology, point["assignments"]
+                    )
+                    self.log(f"参数扫描 {index}/{total}", "INFO")
+                    outputs = self._run_once(
+                        point_topology,
+                        eng=eng,
+                        cached_outputs=cached_outputs,
+                        skip_nodes=static_nodes if cached_outputs is not None else set(),
+                        retain_cache=True,
+                        manage_cache=False,
+                    )
+                    last_outputs = outputs
+                    if cached_outputs is None:
+                        cached_outputs = outputs
+                        if static_nodes:
+                            self.log(f"已缓存 {len(static_nodes)} 个不受扫描参数影响的组件", "INFO")
+                    rows.extend(self._collect_sweep_rows(outputs, point_topology, point, index))
+                    if checkpoint is not None:
+                        checkpoint.save_rows(rows, total, index)
+            finally:
+                self._cleanup_matlab_after_run(eng)
+
+        if checkpoint is not None:
+            checkpoint.remove()
 
         result = dict(last_outputs)
         result["__sweep__"] = {
@@ -147,6 +216,27 @@ class MatlabTopologyRunner:
     def _raise_if_cancelled(self) -> None:
         if self.cancel_event is not None and self.cancel_event.is_set():
             raise SimulationCancelled("用户已停止仿真。")
+
+    def _wait_if_paused(self) -> None:
+        if self.pause_event is None:
+            return
+        while not self.pause_event.wait(0.2):
+            self._raise_if_cancelled()
+
+    def _static_sweep_nodes(
+        self, topology: dict[str, Any], sweep: dict[str, Any]
+    ) -> set[int]:
+        executor = TopologyExecutor(topology)
+        adjacency, _, _, _ = executor._build_graph()
+        affected = {int(axis["node_id"]) for axis in sweep.get("axes", [])}
+        queue = list(affected)
+        while queue:
+            node_id = queue.pop()
+            for target_id in adjacency.get(node_id, []):
+                if target_id not in affected:
+                    affected.add(target_id)
+                    queue.append(target_id)
+        return set(executor.nodes) - affected
 
     def _feval_interruptible(
         self, eng, func_name: str, *args: Any, nargout: int = 1
@@ -724,11 +814,7 @@ class MatlabTopologyRunner:
         before_memory_mb = self._matlab_memory_mb(eng)
         self._clear_matlab_workspace_cache(eng)
         self._close_hidden_matlab_figures(eng)
-        for command in (
-            "clearvars;",
-            "if usejava('jvm'), java.lang.System.gc(); end",
-            "drawnow;",
-        ):
+        for command in ("clearvars;", "drawnow;"):
             try:
                 eng.eval(command, nargout=0)
             except Exception:
@@ -743,6 +829,8 @@ class MatlabTopologyRunner:
     def _matlab_memory_mb(self, eng) -> float | None:
         try:
             pid = int(float(eng.eval("feature('getpid')", nargout=1)))
+            if platform.system().lower() == "windows":
+                return self._windows_process_memory_mb(pid)
             result = subprocess.run(
                 ["ps", "-o", "rss=", "-p", str(pid)],
                 check=False,
@@ -754,6 +842,43 @@ class MatlabTopologyRunner:
                 return None
             rss_kb = float(result.stdout.strip().splitlines()[0].strip())
             return rss_kb / 1024.0
+        except Exception:
+            return None
+
+    @staticmethod
+    def _windows_process_memory_mb(pid: int) -> float | None:
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD),
+                    ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            process = kernel32.OpenProcess(0x1000 | 0x0010, False, pid)
+            if not process:
+                return None
+            try:
+                counters = PROCESS_MEMORY_COUNTERS()
+                counters.cb = ctypes.sizeof(counters)
+                ok = ctypes.windll.psapi.GetProcessMemoryInfo(
+                    process, ctypes.byref(counters), counters.cb
+                )
+                return counters.WorkingSetSize / (1024.0 * 1024.0) if ok else None
+            finally:
+                kernel32.CloseHandle(process)
         except Exception:
             return None
 

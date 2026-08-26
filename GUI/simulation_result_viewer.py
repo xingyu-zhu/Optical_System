@@ -15,11 +15,17 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import (
     QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
 )
+
+from simulation_artifacts import write_csv, write_xlsx
 
 from signal_plotter import (
     _as_array,
@@ -177,6 +183,11 @@ class SimulationResultDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("仿真结果")
         self.resize(860, 560)
+        self._rows = [
+            {key: value for key, value in row.items() if key != "constellation"}
+            for row in rows
+        ]
+        self._sweep = sweep or {}
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget(self)
@@ -188,6 +199,49 @@ class SimulationResultDialog(QDialog):
         if sweep and sweep.get("rows"):
             self._add_sweep_tab(sweep.get("rows", []))
             self._add_budget_tab(sweep.get("power_budget", []), sweep.get("rows", []))
+
+        buttons = QHBoxLayout()
+        csv_button = QPushButton("导出 CSV", self)
+        xlsx_button = QPushButton("导出 XLSX", self)
+        csv_button.clicked.connect(self._export_csv)
+        xlsx_button.clicked.connect(self._export_xlsx)
+        buttons.addStretch(1)
+        buttons.addWidget(csv_button)
+        buttons.addWidget(xlsx_button)
+        layout.addLayout(buttons)
+
+    def _export_csv(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出 CSV", "simulation_results.csv", "CSV 文件 (*.csv)"
+        )
+        if not path:
+            return
+        rows = self._sweep.get("rows") or self._rows
+        try:
+            write_csv(path, rows)
+            QMessageBox.information(self, "导出完成", f"已导出到：\n{path}")
+        except Exception as exc:
+            QMessageBox.warning(self, "导出失败", str(exc))
+
+    def _export_xlsx(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出 XLSX",
+            "simulation_results.xlsx",
+            "Excel 工作簿 (*.xlsx)",
+        )
+        if not path:
+            return
+        sheets = {"Summary": self._rows}
+        if self._sweep.get("rows"):
+            sheets["Sweep"] = self._sweep["rows"]
+        if self._sweep.get("power_budget"):
+            sheets["PowerBudget"] = self._sweep["power_budget"]
+        try:
+            write_xlsx(path, sheets)
+            QMessageBox.information(self, "导出完成", f"已导出到：\n{path}")
+        except Exception as exc:
+            QMessageBox.warning(self, "导出失败", str(exc))
 
     def _add_summary_tab(self, rows: list[dict[str, Any]]) -> None:
         table = QTableWidget(self)

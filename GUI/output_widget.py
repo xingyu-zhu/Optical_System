@@ -48,16 +48,8 @@ class MatlabDisconnectWorker(QThread):
     def run(self) -> None:
         try:
             if self.engine_manager.is_running():
-                eng = self.engine_manager.engine
-                if eng is not None:
-                    try:
-                        eng.eval(
-                            "try, close all hidden; clearvars; if usejava('jvm'), java.lang.System.gc(); end; drawnow; catch, end",
-                            nargout=0,
-                        )
-                    except Exception:
-                        pass
-                self.engine_manager.stop()
+                self.engine_manager.cleanup_workspace()
+                self.engine_manager.stop(wait=False)
             self.disconnected.emit()
         except Exception as exc:
             self.failed.emit(str(exc))
@@ -80,6 +72,8 @@ class OutputWidget(QWidget):
         self._connect_worker = None
         self._disconnect_worker = None
         self._retry_connect_after_worker_finished = False
+        self._controls_locked = False
+        self._offline = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -150,7 +144,7 @@ class OutputWidget(QWidget):
 
     def connect_matlab(self) -> None:
         """Start or reuse MATLAB engine asynchronously and log status."""
-        if self._connect_worker is not None and self._connect_worker.isRunning():
+        if self._controls_locked or (self._connect_worker is not None and self._connect_worker.isRunning()):
             return
 
         self.engine_status_changed.emit("Starting")
@@ -167,6 +161,9 @@ class OutputWidget(QWidget):
 
     def disconnect_matlab(self) -> None:
         """Disconnect MATLAB engine asynchronously and log status."""
+        if self._controls_locked or self.engine_manager.is_busy():
+            self.append_message("MATLAB 正在执行仿真，当前不能断开连接。", source="INFO")
+            return
         if self._disconnect_worker is not None and self._disconnect_worker.isRunning():
             return
         if self._connect_worker is not None and self._connect_worker.isRunning():
@@ -186,6 +183,7 @@ class OutputWidget(QWidget):
         worker.start()
 
     def _on_connect_success(self, engine: object) -> None:
+        self._offline = False
         self.append_matlab(f"Engine ready: {engine}")
         self.engine_status_changed.emit("Ready")
         self.disconnect_btn.setEnabled(True)
@@ -222,8 +220,8 @@ class OutputWidget(QWidget):
             QMessageBox.warning(self, "MATLAB 路径无效", str(exc))
 
     def _on_connect_worker_finished(self) -> None:
-        self.connect_btn.setEnabled(True)
-        self.disconnect_btn.setEnabled(self.engine_manager.is_running())
+        self.connect_btn.setEnabled(not self._controls_locked and not self.engine_manager.is_running())
+        self.disconnect_btn.setEnabled(not self._controls_locked and self.engine_manager.is_running())
         if self._retry_connect_after_worker_finished:
             self._retry_connect_after_worker_finished = False
             self.connect_matlab()
@@ -239,8 +237,19 @@ class OutputWidget(QWidget):
         self.engine_status_changed.emit("Disconnect Error")
 
     def _on_disconnect_finished(self) -> None:
-        self.connect_btn.setEnabled(True)
-        self.disconnect_btn.setEnabled(self.engine_manager.is_running())
+        self.connect_btn.setEnabled(not self._controls_locked)
+        self.disconnect_btn.setEnabled(self.engine_manager.is_running() and not self._controls_locked)
+
+    def set_engine_controls_locked(self, locked: bool) -> None:
+        self._controls_locked = bool(locked)
+        self.connect_btn.setEnabled(not locked and not self.engine_manager.is_running())
+        self.disconnect_btn.setEnabled(not locked and self.engine_manager.is_running())
+
+    def set_offline_mode(self, offline: bool) -> None:
+        self._offline = bool(offline)
+        if offline:
+            self.engine_status_changed.emit("Offline")
+        self.set_engine_controls_locked(self._controls_locked)
 
     def log_python_output(self, message: str) -> None:
         self.append_python(message)
